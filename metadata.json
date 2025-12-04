@@ -1,0 +1,7 @@
+{
+  "name": "BalanceAI - 2025 Wellness",
+  "description": "A holistic AI advisor for personalized workout plans and intelligent diet tracking using Gemini.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
