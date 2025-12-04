@@ -28,19 +28,97 @@ const AuthScreen = ({ onNavigate, onLoginSuccess }: { onNavigate: (view: AppView
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    // Mock login logic
-    const saved = localStorage.getItem('profile');
-    if (saved) {
-      onLoginSuccess();
-    } else {
-      setError("アカウントが見つかりません。まずは登録してください。");
+  // Firebase が有効かチェック
+  const isFirebaseEnabled = !!import.meta.env.VITE_FIREBASE_API_KEY;
+
+  const handleEmailLogin = async () => {
+    if (!email || !password) {
+      setError('メールアドレスとパスワードを入力してください');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      if (isFirebaseEnabled) {
+        // Firebase認証を使用
+        const { authService } = await import('./services/authService');
+        await authService.loginWithEmail(email, password);
+        onLoginSuccess();
+      } else {
+        // Mock login logic
+        const saved = localStorage.getItem('profile');
+        if (saved) {
+          onLoginSuccess();
+        } else {
+          setError("アカウントが見つかりません。まずは登録してください。");
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'ログインに失敗しました');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRegister = () => {
-    // Mock registration
-    onNavigate(AppView.Onboarding);
+  const handleEmailRegister = async () => {
+    if (!email || !password) {
+      setError('メールアドレスとパスワードを入力してください');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('パスワードは6文字以上で設定してください');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      if (isFirebaseEnabled) {
+        // Firebase認証を使用
+        const { authService } = await import('./services/authService');
+        await authService.registerWithEmail(email, password);
+      }
+      // 登録後はオンボーディングへ
+      onNavigate(AppView.Onboarding);
+    } catch (err: any) {
+      setError(err.message || '登録に失敗しました');
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    setError('');
+
+    try {
+      if (isFirebaseEnabled) {
+        // Firebase Google認証を使用
+        const { authService } = await import('./services/authService');
+        const user = await authService.loginWithGoogle();
+        
+        // 新規ユーザーかどうかチェック（プロフィールの有無）
+        const { firestoreService } = await import('./services/firestoreService');
+        const profile = await firestoreService.getUserProfile(user.uid);
+        
+        if (profile) {
+          // 既存ユーザーはダッシュボードへ
+          onLoginSuccess();
+        } else {
+          // 新規ユーザーはオンボーディングへ
+          onNavigate(AppView.Onboarding);
+        }
+      } else {
+        setError('Googleログインを使用するにはFirebaseの設定が必要です。開発者向け: SETUP.mdを参照してください。');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Googleログインに失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handlePasswordReset = async () => {
@@ -53,15 +131,22 @@ const AuthScreen = ({ onNavigate, onLoginSuccess }: { onNavigate: (view: AppView
     setError('');
     setSuccess('');
 
-    // Simulate password reset (replace with actual Firebase call later)
-    setTimeout(() => {
+    try {
+      if (isFirebaseEnabled) {
+        // Firebase パスワードリセット
+        const { authService } = await import('./services/authService');
+        await authService.resetPassword(email);
+      }
       setSuccess('パスワードリセットメールを送信しました。メールをご確認ください。');
-      setIsLoading(false);
       setTimeout(() => {
         setMode('login');
         setSuccess('');
       }, 3000);
-    }, 1000);
+    } catch (err: any) {
+      setError(err.message || 'パスワードリセットに失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -141,18 +226,29 @@ const AuthScreen = ({ onNavigate, onLoginSuccess }: { onNavigate: (view: AppView
              
              <div className="pt-4 space-y-3">
                <Button 
-                 onClick={mode === 'login' ? handleLogin : handleRegister} 
+                 onClick={mode === 'login' ? handleEmailLogin : handleEmailRegister} 
                  isLoading={isLoading}
                  className="w-full py-3.5"
+                 disabled={isLoading}
                >
                  <Mail size={18} />
                  {mode === 'login' ? 'メールでログイン' : 'メールで登録'}
                </Button>
                
-               {/* Google Login (Future implementation) */}
+               <div className="relative">
+                 <div className="absolute inset-0 flex items-center">
+                   <div className="w-full border-t border-surface-200"></div>
+                 </div>
+                 <div className="relative flex justify-center text-xs uppercase">
+                   <span className="bg-white px-2 text-surface-500 font-bold">または</span>
+                 </div>
+               </div>
+               
+               {/* Google Login */}
                <button 
-                 onClick={() => setError('Googleログインは近日公開予定です')}
-                 className="w-full py-3.5 px-6 bg-white border-2 border-surface-200 text-surface-900 rounded-2xl font-bold hover:bg-surface-50 transition-all flex items-center justify-center gap-2 shadow-sm"
+                 onClick={handleGoogleLogin}
+                 disabled={isLoading}
+                 className="w-full py-3.5 px-6 bg-white border-2 border-surface-200 text-surface-900 rounded-2xl font-bold hover:bg-surface-50 hover:border-surface-300 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  <svg className="w-5 h-5" viewBox="0 0 24 24">
                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -160,12 +256,13 @@ const AuthScreen = ({ onNavigate, onLoginSuccess }: { onNavigate: (view: AppView
                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                  </svg>
-                 Googleで{mode === 'login' ? 'ログイン' : '登録'}
+                 {isLoading ? '処理中...' : `Googleで${mode === 'login' ? 'ログイン' : '登録'}`}
                </button>
                
                <button 
                  onClick={() => { setMode('landing'); setError(''); }}
-                 className="w-full text-center text-sm font-bold text-surface-400 py-2 hover:text-surface-900 transition-colors"
+                 disabled={isLoading}
+                 className="w-full text-center text-sm font-bold text-surface-400 py-2 hover:text-surface-900 transition-colors disabled:opacity-50"
                >
                  キャンセル
                </button>
@@ -827,29 +924,77 @@ const App = () => {
   const globalChatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Load data
-    const savedProfile = localStorage.getItem('profile');
-    if (savedProfile) {
-      setProfile(JSON.parse(savedProfile));
-      setView(AppView.Dashboard);
+    // Firebase認証状態の監視
+    const isFirebaseEnabled = !!import.meta.env.VITE_FIREBASE_API_KEY;
+    
+    if (isFirebaseEnabled) {
+      import('./services/authService').then(({ authService }) => {
+        const unsubscribe = authService.onAuthChange(async (user) => {
+          if (user) {
+            // ログイン済み - Firestoreからデータを読み込む
+            const { firestoreService } = await import('./services/firestoreService');
+            const userProfile = await firestoreService.getUserProfile(user.uid);
+            
+            if (userProfile) {
+              setProfile(userProfile);
+              setView(AppView.Dashboard);
+              
+              // その他のデータも読み込む
+              const plan = await firestoreService.getWorkoutPlan(user.uid);
+              if (plan) setWorkoutPlan(plan);
+              
+              const logs = await firestoreService.getDietLogs(user.uid);
+              setDietLogs(logs);
+              
+              const weights = await firestoreService.getWeightLogs(user.uid);
+              setWeightLogs(weights);
+            }
+          }
+        });
+        
+        return () => unsubscribe();
+      });
+    } else {
+      // LocalStorageからデータを読み込む（Firebase未設定時）
+      const savedProfile = localStorage.getItem('profile');
+      if (savedProfile) {
+        setProfile(JSON.parse(savedProfile));
+        setView(AppView.Dashboard);
+      }
+
+      const savedPlan = localStorage.getItem('workoutPlan');
+      if (savedPlan) setWorkoutPlan(JSON.parse(savedPlan));
+
+      const savedDiet = localStorage.getItem('dietLogs');
+      if (savedDiet) setDietLogs(JSON.parse(savedDiet));
+
+      const savedWeight = localStorage.getItem('weightLogs');
+      if (savedWeight) setWeightLogs(JSON.parse(savedWeight));
     }
-
-    const savedPlan = localStorage.getItem('workoutPlan');
-    if (savedPlan) setWorkoutPlan(JSON.parse(savedPlan));
-
-    const savedDiet = localStorage.getItem('dietLogs');
-    if (savedDiet) setDietLogs(JSON.parse(savedDiet));
-
-    const savedWeight = localStorage.getItem('weightLogs');
-    if (savedWeight) setWeightLogs(JSON.parse(savedWeight));
   }, []);
 
   useEffect(() => {
     // Persist data
-    if (profile) localStorage.setItem('profile', JSON.stringify(profile));
-    if (workoutPlan) localStorage.setItem('workoutPlan', JSON.stringify(workoutPlan));
-    localStorage.setItem('dietLogs', JSON.stringify(dietLogs));
-    localStorage.setItem('weightLogs', JSON.stringify(weightLogs));
+    const isFirebaseEnabled = !!import.meta.env.VITE_FIREBASE_API_KEY;
+    
+    if (isFirebaseEnabled) {
+      // Firebaseに保存
+      import('./services/authService').then(async ({ authService }) => {
+        const user = authService.getCurrentUser();
+        if (user) {
+          const { firestoreService } = await import('./services/firestoreService');
+          
+          if (profile) await firestoreService.saveUserProfile(user.uid, profile);
+          if (workoutPlan) await firestoreService.saveWorkoutPlan(user.uid, workoutPlan);
+        }
+      });
+    } else {
+      // LocalStorageに保存（Firebase未設定時）
+      if (profile) localStorage.setItem('profile', JSON.stringify(profile));
+      if (workoutPlan) localStorage.setItem('workoutPlan', JSON.stringify(workoutPlan));
+      localStorage.setItem('dietLogs', JSON.stringify(dietLogs));
+      localStorage.setItem('weightLogs', JSON.stringify(weightLogs));
+    }
   }, [profile, workoutPlan, dietLogs, weightLogs]);
 
   // Generate Daily Encouragement
@@ -888,6 +1033,20 @@ const App = () => {
     try {
       const plan = await generateWorkoutPlan(p);
       setWorkoutPlan(plan);
+      
+      // Firebase有効時はFirestoreに保存
+      const isFirebaseEnabled = !!import.meta.env.VITE_FIREBASE_API_KEY;
+      if (isFirebaseEnabled) {
+        const { authService } = await import('./services/authService');
+        const { firestoreService } = await import('./services/firestoreService');
+        const user = authService.getCurrentUser();
+        
+        if (user) {
+          await firestoreService.saveUserProfile(user.uid, p);
+          await firestoreService.saveWorkoutPlan(user.uid, plan);
+        }
+      }
+      
       setView(AppView.Dashboard);
       
       // Initial welcome message for global chat
