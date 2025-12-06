@@ -1,156 +1,129 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { UserProfile, WorkoutPlan, DietLog } from "../types";
 
-import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { UserProfile, WorkoutPlan, DietLog, ChatMessage } from "../types";
-
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
-
-// --- Schemas ---
-
-const ExerciseSchema: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    name: { type: Type.STRING },
-    type: { type: Type.STRING, enum: ['Strength', 'Cardio', 'Flexibility'] },
-    duration: { type: Type.STRING },
-    description: { type: Type.STRING },
-  },
-  required: ['name', 'type', 'duration', 'description'],
+// Expo環境変数の取得
+const getApiKey = () => {
+  // 開発時は直接APIキーを設定（本番では環境変数から取得）
+  return "YOUR_GEMINI_API_KEY_HERE"; // ここにAPIキーを設定してください
 };
 
-const DailyWorkoutSchema: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    day: { type: Type.STRING },
-    focus: { type: Type.STRING },
-    exercises: { type: Type.ARRAY, items: ExerciseSchema },
-  },
-  required: ['day', 'focus', 'exercises'],
-};
+const genAI = new GoogleGenerativeAI(getApiKey());
 
-const WorkoutPlanSchema: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    summary: { type: Type.STRING },
-    recommendedCalories: { type: Type.NUMBER, description: "Daily recommended calorie intake based on user BMR and goal" },
-    schedule: { type: Type.ARRAY, items: DailyWorkoutSchema },
-  },
-  required: ['summary', 'recommendedCalories', 'schedule'],
-};
-
-const NutritionSchema: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    foodName: { type: Type.STRING },
-    calories: { type: Type.NUMBER },
-    protein: { type: Type.NUMBER },
-    fat: { type: Type.NUMBER },
-    carbs: { type: Type.NUMBER },
-    advice: { type: Type.STRING },
-  },
-  required: ['foodName', 'calories', 'protein', 'fat', 'carbs', 'advice'],
-};
-
-// --- Functions ---
-
+// --- ワークアウトプラン生成 ---
 export const generateWorkoutPlan = async (profile: UserProfile): Promise<WorkoutPlan> => {
   try {
     const gymContext = profile.hasGymAccess 
-      ? "User has access to a GYM. Include exercises using machines, barbells, and dumbbells where appropriate." 
-      : "User works out at HOME. Focus on bodyweight exercises, or simple equipment if typical.";
+      ? "ジムでマシンやダンベルを使えます" 
+      : "自宅で自重トレーニング中心です";
 
     const prompt = `
-      Create a personalized weekly workout plan AND nutritional target for this user:
-      Profile: ${profile.age} years old, ${profile.gender}, ${profile.height}cm.
-      Current Weight: ${profile.weight}kg.
-      Target Weight: ${profile.targetWeight}kg.
-      Goal: ${profile.goal}.
-      Activity Level: ${profile.activityLevel}.
-      Environment: ${gymContext}
-      
-      1. Calculate the optimal daily calorie intake (recommendedCalories) to achieve their target weight safely.
-      2. Create a 7-day workout schedule.
-      3. Return a JSON object with a summary, the recommendedCalories, and the schedule.
-      Ensure the plan is realistic, safe, and specifically tailored to their environment (Gym vs Home).
-      IMPORTANT: Do NOT use emojis in the text content. Keep it professional and clean.
-      Language: Japanese.
-    `;
+あなたはプロのフィットネストレーナーです。以下のユーザーに最適な週間ワークアウトプランを作成してください。
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: WorkoutPlanSchema,
-      },
-    });
+【ユーザー情報】
+- 年齢: ${profile.age}歳
+- 性別: ${profile.gender}
+- 身長: ${profile.height}cm
+- 現在の体重: ${profile.weight}kg
+- 目標体重: ${profile.targetWeight}kg
+- 目標: ${profile.goal}
+- 活動レベル: ${profile.activityLevel}
+- 環境: ${gymContext}
 
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
+【指示】
+1. 1日の推奨カロリー摂取量を計算
+2. 週7日分のトレーニングプランを作成
+3. 以下のJSON形式で返してください：
+
+{
+  "summary": "プラン全体の説明（100文字程度）",
+  "recommendedCalories": 2000,
+  "schedule": [
+    {
+      "day": "月曜日",
+      "focus": "上半身",
+      "exercises": [
+        {
+          "name": "腕立て伏せ",
+          "type": "Strength",
+          "duration": "10分",
+          "description": "胸と腕を鍛える基本種目"
+        }
+      ]
+    }
+  ]
+}
+
+【重要】
+- 絵文字は使わない
+- 安全で実現可能なメニューを
+- 初心者でも続けられる内容に
+`;
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
     
-    // Add IDs to exercises manually since schema doesn't generate UUIDs
-    const plan = JSON.parse(text) as WorkoutPlan;
+    // JSONを抽出（マークダウンのコードブロックを削除）
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("Invalid response format");
+    }
+    
+    const plan = JSON.parse(jsonMatch[0]) as WorkoutPlan;
+    
+    // エクササイズにIDを追加
     plan.schedule.forEach(day => {
       day.exercises.forEach((ex: any) => {
-        ex.id = crypto.randomUUID();
+        ex.id = `${Date.now()}-${Math.random()}`;
         ex.isCompleted = false;
       });
     });
     
     return plan;
-  } catch (error) {
-    console.error("Error generating workout:", error);
-    throw error;
+  } catch (error: any) {
+    console.error("Workout generation error:", error);
+    throw new Error("ワークアウトプランの生成に失敗しました");
   }
 };
 
-export const analyzeFoodImage = async (base64Image: string | null, textDescription: string): Promise<DietLog['macros'] & { foodName: string, advice: string }> => {
+// --- 食事分析 ---
+export const analyzeFoodImage = async (
+  base64Image: string | null, 
+  textDescription: string
+): Promise<DietLog['macros'] & { foodName: string, advice: string }> => {
   try {
-    const parts: any[] = [];
+    const prompt = `
+食品「${textDescription}」の栄養成分を分析してJSON形式で返してください。
+
+{
+  "foodName": "料理名",
+  "calories": カロリー(kcal),
+  "protein": タンパク質(g),
+  "fat": 脂質(g),
+  "carbs": 炭水化物(g),
+  "advice": "一言アドバイス（30文字以内）"
+}
+
+絵文字は使わないでください。
+`;
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
     
-    if (base64Image) {
-      const data = base64Image.split(',')[1] || base64Image;
-      parts.push({
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: data,
-        },
-      });
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("Invalid response format");
     }
-
-    if (textDescription) {
-      parts.push({ text: `Description of food: ${textDescription}` });
-    }
-
-    parts.push({ text: "Analyze the nutritional content of this meal. Provide calories, protein (g), fat (g), carbs (g), a short name for the dish, and brief health advice in Japanese. Do NOT use emojis." });
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: { parts },
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: NutritionSchema,
-      },
-    });
-
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
-    const result = JSON.parse(text);
-
-    return {
-      foodName: result.foodName,
-      calories: result.calories,
-      protein: result.protein,
-      fat: result.fat,
-      carbs: result.carbs,
-      advice: result.advice,
-    };
-  } catch (error) {
-    console.error("Error analyzing food:", error);
-    throw error;
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (error: any) {
+    console.error("Food analysis error:", error);
+    throw new Error("食事分析に失敗しました");
   }
 };
 
+// --- デイリーメッセージ生成 ---
 export const generateDailyEncouragement = async (
   profile: UserProfile, 
   currentCalories: number, 
@@ -158,91 +131,19 @@ export const generateDailyEncouragement = async (
 ): Promise<string> => {
   try {
     const prompt = `
-      You are a friendly, supportive fitness coach.
-      User: ${profile.name}
-      Goal: ${profile.goal}
-      Today's Status: Consumed ${currentCalories}kcal out of ${targetCalories}kcal target.
-      
-      Provide a VERY SHORT (max 60 characters), warm, encouraging message for the user's dashboard.
-      If they are doing well, praise them. If they are over, gently encourage balance. If under, tell them to fuel up.
-      IMPORTANT: Do NOT use emojis. Use text only.
-      Language: Japanese.
-      Example: "いい調子ですね！このまま目標に向かって進みましょう"
-    `;
+あなたはフィットネスコーチです。
+ユーザー: ${profile.name}さん
+目標: ${profile.goal}
+今日のカロリー: ${currentCalories}kcal / ${targetCalories}kcal
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-    });
+60文字以内で励ましのメッセージを。絵文字は使わない。日本語で。
+`;
 
-    return response.text?.trim() || "今日も良い一日を！自分のペースで頑張りましょう。";
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
   } catch (error) {
-    console.error("Error generating encouragement:", error);
+    console.error("Daily message error:", error);
     return "今日も健康的な一日を過ごしましょう！";
-  }
-};
-
-/**
- * Stream chat messages for faster perceived latency
- */
-export const streamChatMessage = async function* (
-  history: ChatMessage[], 
-  profile: UserProfile,
-  additionalContext: string = ""
-) {
-  try {
-    // Extract the latest user message
-    const lastMsg = history[history.length - 1];
-    if (!lastMsg || lastMsg.role !== 'user') {
-      throw new Error("Invalid history state: Last message must be user");
-    }
-    
-    const currentMessage = lastMsg.text;
-    // Previous history for context
-    const previousMessages = history.slice(0, -1);
-
-    const context = `
-      You are an expert fitness and nutrition coach named "BalanceAI".
-      User Profile:
-      - Name: ${profile.name}
-      - Goal: ${profile.goal}
-      - Current Weight: ${profile.weight}kg, Target: ${profile.targetWeight}kg
-      - Recommended Calories: ${profile.recommendedCalories || 'Not set yet'}
-      - Gym Access: ${profile.hasGymAccess ? 'Yes' : 'No'}
-      
-      ${additionalContext ? `CURRENT CONTEXT (The user is looking at this right now): ${additionalContext}` : ''}
-      
-      Answer the user's questions, provide motivation, or suggest modifications to their plan.
-      Keep answers concise (under 200 characters if possible) and encouraging.
-      IMPORTANT: Do NOT use emojis. The application provides its own UI icons.
-      Language: Japanese.
-    `;
-
-    // Map internal chat format to Gemini SDK format
-    const sdkHistory = previousMessages
-      .filter(m => m.id !== 'init') // Skip local welcome message if not needed for context
-      .map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.text }],
-      }));
-
-    const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
-      config: {
-        systemInstruction: context,
-      },
-      history: sdkHistory
-    });
-
-    const result = await chat.sendMessageStream({ message: currentMessage });
-    
-    for await (const chunk of result) {
-      if (chunk.text) {
-        yield chunk.text;
-      }
-    }
-  } catch (error) {
-    console.error("Chat stream error:", error);
-    yield "エラーが発生しました。接続を確認してもう一度お試しください。";
   }
 };

@@ -1,33 +1,22 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+// Firebase設定（React Native用）
+// 注意: React Native FirebaseとWeb版Firebaseは異なるパッケージです
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+// Expo環境でのFirebase設定
+export const firebaseConfig = {
+  apiKey: "YOUR_FIREBASE_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
-// Initialize Firebase
-let app;
-let auth;
-let db;
-let storage;
-let googleProvider;
+// Firebaseを使用する場合:
+// 1. Firebase Consoleでプロジェクトを作成
+// 2. 上記の設定値を取得して置き換え
+// 3. 以下のパッケージをインストール:
+//    npm install firebase
+// 4. Firebase Authentication, Firestoreを有効化
 
-try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = getStorage(app);
-  googleProvider = new GoogleAuthProvider();
-} catch (error) {
-  console.error('Firebase initialization error:', error);
-}
-
-export { app, auth, db, storage, googleProvider };
-
+// 現在はローカルストレージ（AsyncStorage）のみを使用
+// Firebaseは必要に応じて後で追加可能

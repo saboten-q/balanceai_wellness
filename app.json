@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "BalanceAI Wellness",
+    "slug": "balanceai-wellness",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.balanceai.wellness"
+    },
+    "android": {
+      "package": "com.balanceai.wellness"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id-here"
+      }
+    }
+  }
+}

@@ -1,93 +1,84 @@
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  sendPasswordResetEmail,
-  onAuthStateChanged,
-  User,
-} from 'firebase/auth';
-import { auth, googleProvider } from './firebaseConfig';
+// 認証サービス（AsyncStorage版）
+// Firebase認証は必要に応じて後で追加
 
-export const authService = {
-  // メール/パスワードで登録
-  async registerWithEmail(email: string, password: string): Promise<User> {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth!, email, password);
-      return userCredential.user;
-    } catch (error: any) {
-      console.error('Registration error:', error);
-      throw new Error(getAuthErrorMessage(error.code));
-    }
-  },
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-  // メール/パスワードでログイン
-  async loginWithEmail(email: string, password: string): Promise<User> {
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth!, email, password);
-      return userCredential.user;
-    } catch (error: any) {
-      console.error('Login error:', error);
-      throw new Error(getAuthErrorMessage(error.code));
-    }
-  },
+interface AuthUser {
+  uid: string;
+  email: string;
+  displayName?: string;
+}
 
-  // Googleログイン
-  async loginWithGoogle(): Promise<User> {
+class AuthService {
+  // メールとパスワードでログイン（モック実装）
+  async loginWithEmail(email: string, password: string): Promise<AuthUser> {
     try {
-      const result = await signInWithPopup(auth!, googleProvider!);
-      return result.user;
+      // AsyncStorageから保存されたユーザー情報を取得
+      const savedProfile = await AsyncStorage.getItem('profile');
+      
+      if (!savedProfile) {
+        throw new Error('アカウントが見つかりません。まずは登録してください。');
+      }
+      
+      // ログイン成功をシミュレート
+      const user: AuthUser = {
+        uid: 'local-user',
+        email: email,
+      };
+      
+      await AsyncStorage.setItem('authUser', JSON.stringify(user));
+      return user;
     } catch (error: any) {
-      console.error('Google login error:', error);
-      throw new Error('Googleログインに失敗しました');
+      throw error;
     }
-  },
+  }
+
+  // メールとパスワードで登録（モック実装）
+  async registerWithEmail(email: string, password: string): Promise<AuthUser> {
+    try {
+      if (password.length < 6) {
+        throw new Error('パスワードは6文字以上で設定してください');
+      }
+      
+      const user: AuthUser = {
+        uid: 'local-user',
+        email: email,
+      };
+      
+      await AsyncStorage.setItem('authUser', JSON.stringify(user));
+      return user;
+    } catch (error: any) {
+      throw error;
+    }
+  }
+
+  // 現在のユーザーを取得
+  async getCurrentUser(): Promise<AuthUser | null> {
+    try {
+      const userJson = await AsyncStorage.getItem('authUser');
+      return userJson ? JSON.parse(userJson) : null;
+    } catch (error) {
+      return null;
+    }
+  }
 
   // ログアウト
   async logout(): Promise<void> {
     try {
-      await signOut(auth!);
+      await AsyncStorage.removeItem('authUser');
+      // プロフィールデータも削除する場合はコメントを外す
+      // await AsyncStorage.clear();
     } catch (error) {
       console.error('Logout error:', error);
-      throw new Error('ログアウトに失敗しました');
     }
-  },
+  }
 
-  // パスワードリセットメール送信
+  // パスワードリセット（モック実装）
   async resetPassword(email: string): Promise<void> {
-    try {
-      await sendPasswordResetEmail(auth!, email);
-    } catch (error: any) {
-      console.error('Password reset error:', error);
-      throw new Error(getAuthErrorMessage(error.code));
-    }
-  },
-
-  // 認証状態の監視
-  onAuthChange(callback: (user: User | null) => void) {
-    return onAuthStateChanged(auth!, callback);
-  },
-
-  // 現在のユーザーを取得
-  getCurrentUser(): User | null {
-    return auth?.currentUser || null;
-  },
-};
-
-// エラーメッセージの日本語化
-function getAuthErrorMessage(errorCode: string): string {
-  const errorMessages: { [key: string]: string } = {
-    'auth/email-already-in-use': 'このメールアドレスは既に使用されています',
-    'auth/invalid-email': 'メールアドレスの形式が正しくありません',
-    'auth/operation-not-allowed': 'この操作は許可されていません',
-    'auth/weak-password': 'パスワードは6文字以上で設定してください',
-    'auth/user-disabled': 'このアカウントは無効化されています',
-    'auth/user-not-found': 'ユーザーが見つかりません',
-    'auth/wrong-password': 'パスワードが正しくありません',
-    'auth/too-many-requests': '試行回数が多すぎます。しばらく待ってからお試しください',
-    'auth/network-request-failed': 'ネットワークエラーが発生しました',
-  };
-
-  return errorMessages[errorCode] || '認証エラーが発生しました';
+    // 実際のFirebase実装では、ここでパスワードリセットメールを送信
+    console.log('Password reset requested for:', email);
+    // モック実装では何もしない
+  }
 }
 
+export const authService = new AuthService();

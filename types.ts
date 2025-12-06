@@ -75,4 +75,5 @@ export enum AppView {
   Workout = 'WORKOUT',
   Diet = 'DIET',
   Progress = 'PROGRESS',
+  Settings = 'SETTINGS',
 }
