@@ -44,6 +44,38 @@ const GradientView = ({ colors, start, end, style, children }: any) => {
   );
 };
 
+// --- Bottom Navigation ---
+const BottomNav = ({
+  current,
+  onNavigate,
+}: {
+  current: AppView;
+  onNavigate: (view: AppView) => void;
+}) => (
+  <View style={styles.bottomNav}>
+    {NAV_ITEMS.map((item) => {
+      const active = current === item.view;
+      return (
+        <TouchableOpacity
+          key={item.label}
+          onPress={() => onNavigate(item.view)}
+          style={styles.navItem}
+          accessibilityLabel={item.label}
+        >
+          <Icon
+            name={item.icon as any}
+            size={24}
+            color={active ? COLORS.primary[600] : COLORS.surface[400]}
+          />
+          <Text style={[styles.navLabel, active && { color: COLORS.primary[600] }]}>
+            {item.label}
+          </Text>
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+);
+
 // Constants (COLORS)を設定
 const COLORS = {
   primary: {
@@ -146,6 +178,12 @@ const STORAGE_KEYS = {
 };
 
 const todayDate = () => new Date().toISOString().split('T')[0];
+const NAV_ITEMS = [
+  { icon: 'home-variant-outline', label: 'Home', view: AppView.Dashboard },
+  { icon: 'dumbbell', label: 'Move', view: AppView.Workout },
+  { icon: 'silverware-fork-knife', label: 'Fuel', view: AppView.Diet },
+  { icon: 'chart-timeline-variant', label: 'Insights', view: AppView.Progress },
+];
 
 // --- Auth Screen ---
 const AuthScreen = ({ onNavigate, onLoginSuccess }: { 
@@ -619,6 +657,7 @@ const Dashboard = ({
           </Card>
         </View>
 
+        <Text style={styles.sectionHeadline}>進捗</Text>
         <View style={styles.gridRow}>
           <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf, styles.weightCard]}>
             <View style={styles.cardContent}>
@@ -630,10 +669,11 @@ const Dashboard = ({
             <Text style={styles.weightValue}>{profile.weight}kg</Text>
             <Text style={styles.weightTarget}>目標: {profile.targetWeight}kg</Text>
           </Card>
+        </View>
 
-          <Text style={styles.sectionHeadline}>クイックアクセス</Text>
+        <Text style={styles.sectionHeadline}>クイックアクセス</Text>
+        <View style={styles.gridRow}>
           <Card style={[styles.gridCardHalf]}>
-            <Text style={styles.sectionTitle}>クイックアクセス</Text>
             <View style={styles.quickLinks}>
               <TouchableOpacity onPress={() => onNavigate(AppView.Progress)} style={styles.quickLinkButton}>
                 <Icon name="chart-line" size={18} color={COLORS.primary[600]} />
@@ -647,25 +687,7 @@ const Dashboard = ({
           </Card>
         </View>
       </ScrollView>
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        {[
-          { icon: 'view-dashboard', label: 'ホーム', view: AppView.Dashboard },
-          { icon: 'run', label: '運動', view: AppView.Workout },
-          { icon: 'food-apple', label: '食事', view: AppView.Diet },
-          { icon: 'chart-line', label: '分析', view: AppView.Progress },
-        ].map((item) => (
-          <TouchableOpacity
-            key={item.label}
-            onPress={() => onNavigate(item.view)}
-            style={styles.navItem}
-          >
-            <Icon name={item.icon as any} size={24} color={COLORS.surface[400]} />
-            <Text style={styles.navLabel}>{item.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <BottomNav current={AppView.Dashboard} onNavigate={onNavigate} />
     </SafeAreaView>
   );
 };
@@ -677,12 +699,14 @@ const WorkoutScreen = ({
   onRegenerate,
   onBack,
   isLoading,
+  onNavigate,
 }: {
   plan: WorkoutPlan | null;
   onToggleExercise: (day: string, exerciseId: string) => void;
   onRegenerate: () => void;
   onBack: () => void;
   isLoading: boolean;
+  onNavigate: (view: AppView) => void;
 }) => {
   const openYoutube = (name: string) => {
     const query = encodeURIComponent(`${name} フォーム`);
@@ -754,6 +778,7 @@ const WorkoutScreen = ({
           </Card>
         ))}
       </ScrollView>
+      <BottomNav current={AppView.Workout} onNavigate={onNavigate} />
     </SafeAreaView>
   );
 };
@@ -765,12 +790,14 @@ const DietScreen = ({
   onAddLog,
   onBack,
   isLoading,
+  onNavigate,
 }: {
   logs: DietLog[];
   targetCalories: number;
   onAddLog: (description: string) => void;
   onBack: () => void;
   isLoading: boolean;
+  onNavigate: (view: AppView) => void;
 }) => {
   const [text, setText] = useState('');
 
@@ -843,6 +870,7 @@ const DietScreen = ({
           ))}
         </ScrollView>
       </KeyboardAvoidingView>
+      <BottomNav current={AppView.Diet} onNavigate={onNavigate} />
     </SafeAreaView>
   );
 };
@@ -855,6 +883,7 @@ const ProgressScreen = ({
   onBack,
   dietLogs,
   targetCalories,
+  onNavigate,
 }: {
   weightLogs: WeightLog[];
   profile: UserProfile;
@@ -862,6 +891,7 @@ const ProgressScreen = ({
   onBack: () => void;
   dietLogs: DietLog[];
   targetCalories: number;
+  onNavigate: (view: AppView) => void;
 }) => {
   const [weightInput, setWeightInput] = useState('');
   const sortedLogs = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date));
@@ -992,6 +1022,7 @@ const ProgressScreen = ({
           )}
         </Card>
       </ScrollView>
+      <BottomNav current={AppView.Progress} onNavigate={onNavigate} />
     </SafeAreaView>
   );
 };
@@ -1003,12 +1034,14 @@ const SettingsScreen = ({
   onBack,
   onLogout,
   onEditProfile,
+  onNavigate,
 }: {
   profile: UserProfile;
   onReset: () => void;
   onBack: () => void;
   onLogout: () => void;
   onEditProfile: () => void;
+  onNavigate: (view: AppView) => void;
 }) => {
   return (
     <SafeAreaView style={styles.container}>
@@ -1049,6 +1082,7 @@ const SettingsScreen = ({
           </Button>
         </Card>
       </ScrollView>
+      <BottomNav current={AppView.Settings} onNavigate={onNavigate} />
     </SafeAreaView>
   );
 };
@@ -1372,6 +1406,7 @@ const App = () => {
           onRegenerate={() => profile && generatePlanWithFallback(profile)}
           onBack={() => setView(AppView.Dashboard)}
           isLoading={isPlanLoading}
+          onNavigate={setView}
         />
       )}
 
@@ -1382,6 +1417,7 @@ const App = () => {
           onAddLog={addDietLog}
           onBack={() => setView(AppView.Dashboard)}
           isLoading={isDietLoading}
+          onNavigate={setView}
         />
       )}
 
@@ -1393,6 +1429,7 @@ const App = () => {
           dietLogs={dietLogs}
           targetCalories={targetCalories}
           onBack={() => setView(AppView.Dashboard)}
+          onNavigate={setView}
         />
       )}
 
@@ -1403,6 +1440,7 @@ const App = () => {
           onLogout={logout}
           onEditProfile={openEditProfile}
           onBack={() => setView(AppView.Dashboard)}
+          onNavigate={setView}
         />
       )}
 
@@ -1799,6 +1837,8 @@ const styles = StyleSheet.create({
   },
   gridCardHalf: {
     flex: 1,
+    flexBasis: '100%',
+    minWidth: '100%',
   },
   dietCard: {
     backgroundColor: COLORS.white,
