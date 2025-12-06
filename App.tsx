@@ -503,7 +503,6 @@ const Dashboard = ({
   dailyMessage,
   onRefreshMessage,
   isRefreshingMessage,
-  onEditProfile,
 }: { 
   profile: UserProfile;
   onNavigate: (view: AppView) => void;
@@ -513,7 +512,6 @@ const Dashboard = ({
   dailyMessage: string | null;
   onRefreshMessage: () => void;
   isRefreshingMessage: boolean;
-  onEditProfile: () => void;
 }) => {
   const todayIndex = new Date().getDay(); // 0:Sun
   const todayPlan = workoutPlan?.schedule?.[todayIndex] || workoutPlan?.schedule?.[0];
@@ -532,10 +530,6 @@ const Dashboard = ({
                 目標まであと {Math.abs(profile.weight - profile.targetWeight!).toFixed(1)}kg
               </Text>
             </View>
-            <TouchableOpacity onPress={onEditProfile} style={styles.editChip}>
-              <Icon name="pencil" size={14} color={COLORS.surface[900]} />
-              <Text style={styles.editChipText}>プロフィールを編集</Text>
-            </TouchableOpacity>
           </View>
           <TouchableOpacity
             onPress={() => onNavigate(AppView.Settings)}
@@ -973,11 +967,13 @@ const SettingsScreen = ({
   onReset,
   onBack,
   onLogout,
+  onEditProfile,
 }: {
   profile: UserProfile;
   onReset: () => void;
   onBack: () => void;
   onLogout: () => void;
+  onEditProfile: () => void;
 }) => {
   return (
     <SafeAreaView style={styles.container}>
@@ -997,6 +993,9 @@ const SettingsScreen = ({
           <Text style={styles.sectionSubtitle}>
             体重: {profile.weight}kg / 目標 {profile.targetWeight}kg
           </Text>
+          <Button onPress={onEditProfile} variant="secondary" style={{ marginTop: 12 }}>
+            <Text style={[styles.authButtonTextSecondary, { color: COLORS.surface[900] }]}>プロフィールを編集</Text>
+          </Button>
         </Card>
 
         <Card>
@@ -1328,7 +1327,6 @@ const App = () => {
           dailyMessage={dailyMessage}
           onRefreshMessage={refreshDailyMessage}
           isRefreshingMessage={isMessageLoading}
-          onEditProfile={openEditProfile}
         />
       )}
 
@@ -1368,6 +1366,7 @@ const App = () => {
           profile={profile}
           onReset={resetAll}
           onLogout={logout}
+          onEditProfile={openEditProfile}
           onBack={() => setView(AppView.Dashboard)}
         />
       )}
@@ -2000,23 +1999,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.surface[600],
     lineHeight: 18,
-  },
-
-  // Edit chip
-  editChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
-    backgroundColor: COLORS.surface[100],
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  editChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.surface[800],
   },
 
   // Progress
