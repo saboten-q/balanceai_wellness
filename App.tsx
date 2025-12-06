@@ -76,34 +76,34 @@ const BottomNav = ({
   </View>
 );
 
-// Constants (COLORS)を設定
+// Constants (COLORS)を設定 - クリアコントラスト
 const COLORS = {
   primary: {
-    50: '#eef2ff',
-    100: '#e0e7ff',
-    400: '#6366f1',
-    500: '#4f46e5',
-    600: '#4338ca',
-    700: '#3730a3',
+    50: '#eff6ff',
+    100: '#dbeafe',
+    400: '#2563eb',
+    500: '#1d4ed8',
+    600: '#1e40af',
+    700: '#1e3a8a',
   },
   accent: {
-    50: '#ecfeff',
-    100: '#cffafe',
-    400: '#22d3ee',
-    500: '#06b6d4',
+    50: '#fef3c7',
+    100: '#fde68a',
+    400: '#f59e0b',
+    500: '#d97706',
   },
   surface: {
-    50: '#f8fafc',
-    100: '#f1f5f9',
-    200: '#e2e8f0',
-    300: '#cbd5e1',
-    400: '#94a3b8',
-    500: '#64748b',
-    600: '#475569',
-    900: '#0f172a',
+    50: '#ffffff',
+    100: '#f8fafc',
+    200: '#e5e7eb',
+    300: '#d1d5db',
+    400: '#9ca3af',
+    500: '#6b7280',
+    600: '#374151',
+    900: '#111827',
   },
   white: '#ffffff',
-  green: '#22c55e',
+  green: '#10b981',
 };
 
 const FALLBACK_PLAN: WorkoutPlan = {
