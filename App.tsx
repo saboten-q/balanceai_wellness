@@ -20,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { Button, Card, Input, Select } from './components/UIComponents';
-import { UserProfile, Gender, AppView, WorkoutPlan, DietLog, WeightLog, Exercise } from './types';
+import { UserProfile, Gender, AppView, WorkoutPlan, DietLog, WeightLog, Exercise, ConditionLog, ExerciseRecord } from './types';
 import { generateWorkoutPlan, analyzeFoodImage, generateDailyEncouragement } from './services/geminiService';
 import { LineChart } from 'react-native-chart-kit';
 
@@ -175,6 +175,8 @@ const STORAGE_KEYS = {
   dietLogs: 'dietLogs',
   weightLogs: 'weightLogs',
   dailyMessage: 'dailyMessage',
+  conditionLogs: 'conditionLogs',
+  exerciseRecords: 'exerciseRecords',
 };
 
 const todayDate = () => new Date().toISOString().split('T')[0];
@@ -541,6 +543,9 @@ const Dashboard = ({
   dailyMessage,
   onRefreshMessage,
   isRefreshingMessage,
+  conditionLogs,
+  onAddCondition,
+  exerciseRecords,
 }: { 
   profile: UserProfile;
   onNavigate: (view: AppView) => void;
@@ -550,12 +555,68 @@ const Dashboard = ({
   dailyMessage: string | null;
   onRefreshMessage: () => void;
   isRefreshingMessage: boolean;
+  conditionLogs: ConditionLog[];
+  onAddCondition: (condition: Omit<ConditionLog, 'id' | 'date'>) => void;
+  exerciseRecords: ExerciseRecord[];
 }) => {
+  const [showConditionModal, setShowConditionModal] = useState(false);
+  const [conditionInput, setConditionInput] = useState({ fatigueLevel: 3, muscleSoreness: 3, sleepQuality: 3, motivation: 3 });
+
   const todayIndex = new Date().getDay(); // 0:Sun
   const todayPlan = workoutPlan?.schedule?.[todayIndex] || workoutPlan?.schedule?.[0];
   const completedCount = todayPlan ? todayPlan.exercises.filter((e) => e.isCompleted).length : 0;
   const totalCount = todayPlan?.exercises.length || 0;
   const calorieProgress = targetCalories ? Math.min(1, todayCalories / targetCalories) : 0;
+
+  // ストリーク計算（連続トレーニング日数）
+  const streak = useMemo(() => {
+    const sortedRecords = [...exerciseRecords].sort((a, b) => b.date.localeCompare(a.date));
+    if (sortedRecords.length === 0) return 0;
+    
+    let count = 0;
+    let currentDate = todayDate();
+    const uniqueDates = new Set(sortedRecords.map(r => r.date));
+    
+    while (uniqueDates.has(currentDate)) {
+      count++;
+      const date = new Date(currentDate);
+      date.setDate(date.getDate() - 1);
+      currentDate = date.toISOString().split('T')[0];
+    }
+    return count;
+  }, [exerciseRecords]);
+
+  // 週間達成率（過去7日間）
+  const weeklyCompletion = useMemo(() => {
+    const last7Days = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      last7Days.push(date.toISOString().split('T')[0]);
+    }
+    const completedDays = last7Days.filter(date => exerciseRecords.some(r => r.date === date));
+    return Math.round((completedDays.length / 7) * 100);
+  }, [exerciseRecords]);
+
+  // 今日のコンディション
+  const todayCondition = useMemo(() => {
+    return conditionLogs.find(log => log.date === todayDate());
+  }, [conditionLogs]);
+
+  // 最後のトレーニングからの経過日数
+  const daysSinceLastWorkout = useMemo(() => {
+    if (exerciseRecords.length === 0) return null;
+    const sorted = [...exerciseRecords].sort((a, b) => b.date.localeCompare(a.date));
+    const lastDate = new Date(sorted[0].date);
+    const today = new Date();
+    const diff = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+    return diff;
+  }, [exerciseRecords]);
+
+  const handleSaveCondition = () => {
+    onAddCondition(conditionInput);
+    setShowConditionModal(false);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -598,6 +659,64 @@ const Dashboard = ({
           </View>
         </Card>
 
+        {/* ストリーク・週間達成率・コンディション */}
+        <View style={styles.gridRow}>
+          <Card style={[styles.gridCardHalf]}>
+            <View style={styles.cardContent}>
+              <View style={styles.cardIconSmall}>
+                <Icon name="fire" size={18} color={COLORS.primary[600]} />
+              </View>
+              <Text style={styles.cardLabelSmall}>Streak</Text>
+            </View>
+            <Text style={styles.workoutFocus}>{streak}日連続</Text>
+            <Text style={styles.workoutSubtext}>継続トレーニング</Text>
+          </Card>
+
+          <Card style={[styles.gridCardHalf]}>
+            <View style={styles.cardContent}>
+              <View style={styles.cardIconSmall}>
+                <Icon name="chart-box-outline" size={18} color={COLORS.accent[500]} />
+              </View>
+              <Text style={styles.cardLabelSmall}>Weekly</Text>
+            </View>
+            <Text style={styles.workoutFocus}>{weeklyCompletion}%</Text>
+            <Text style={styles.workoutSubtext}>週間達成率</Text>
+          </Card>
+        </View>
+
+        {/* コンディション入力カード */}
+        <Card onPress={() => setShowConditionModal(true)} style={{ backgroundColor: todayCondition ? COLORS.primary[50] : COLORS.surface[50] }}>
+          <View style={styles.cardContent}>
+            <View style={[styles.cardIconSmall, { backgroundColor: todayCondition ? COLORS.primary[100] : COLORS.surface[100] }]}>
+              <Icon name="heart-pulse" size={18} color={todayCondition ? COLORS.primary[600] : COLORS.surface[500]} />
+            </View>
+            <Text style={styles.cardLabelSmall}>{todayCondition ? '今日のコンディション記録済み' : 'コンディションを記録'}</Text>
+          </View>
+          {todayCondition && (
+            <Text style={styles.workoutSubtext}>
+              疲労: {todayCondition.fatigueLevel}/5 | 筋肉痛: {todayCondition.muscleSoreness}/5 | 睡眠: {todayCondition.sleepQuality}/5
+            </Text>
+          )}
+          {!todayCondition && (
+            <Text style={styles.workoutSubtext}>タップして今日の体調を記録しましょう</Text>
+          )}
+        </Card>
+
+        {/* 休養推奨通知 */}
+        {daysSinceLastWorkout !== null && daysSinceLastWorkout >= 3 && (
+          <Card style={{ backgroundColor: COLORS.accent[50], borderColor: COLORS.accent[200], borderWidth: 1 }}>
+            <View style={styles.cardContent}>
+              <Icon name="alert-circle-outline" size={24} color={COLORS.accent[500]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardLabelSmall, { color: COLORS.accent[500] }]}>休養のお知らせ</Text>
+                <Text style={styles.workoutSubtext}>
+                  最後のトレーニングから{daysSinceLastWorkout}日経過しています。無理せず、体調に合わせてトレーニングを再開しましょう。
+                </Text>
+              </View>
+            </View>
+          </Card>
+        )}
+
         <Text style={styles.sectionHeadline}>アクション</Text>
         <Card style={styles.dailyMessageCard}>
           <View style={styles.dailyMessageIcon}>
@@ -626,10 +745,21 @@ const Dashboard = ({
               {todayPlan ? `${todayPlan.day} | ${todayPlan.focus}` : 'プラン未生成'}
             </Text>
             <Text style={styles.workoutSubtext}>今日のプランを確認</Text>
-            <View style={styles.workoutAction}>
-              <Text style={styles.workoutActionText}>プランを見る</Text>
-              <Icon name="arrow-right" size={16} color={COLORS.primary[600]} />
-            </View>
+            {todayPlan && (
+              <TouchableOpacity 
+                onPress={() => onNavigate(AppView.Workout)} 
+                style={[styles.workoutAction, { backgroundColor: COLORS.primary[600], paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginTop: 8 }]}
+              >
+                <Icon name="play" size={16} color={COLORS.white} />
+                <Text style={[styles.workoutActionText, { color: COLORS.white }]}>クイックスタート</Text>
+              </TouchableOpacity>
+            )}
+            {!todayPlan && (
+              <View style={styles.workoutAction}>
+                <Text style={styles.workoutActionText}>プランを見る</Text>
+                <Icon name="arrow-right" size={16} color={COLORS.primary[600]} />
+              </View>
+            )}
           </Card>
 
           <Card onPress={() => onNavigate(AppView.Diet)} style={[styles.gridCardHalf, styles.dietCard]}>
@@ -688,6 +818,89 @@ const Dashboard = ({
         </View>
       </ScrollView>
       <BottomNav current={AppView.Dashboard} onNavigate={onNavigate} />
+
+      {/* コンディション入力モーダル */}
+      <Modal
+        visible={showConditionModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowConditionModal(false)}
+      >
+        <View style={styles.modalOverlaySimple}>
+          <View style={styles.modalContentSimple}>
+            <Text style={styles.sectionTitle}>今日のコンディション</Text>
+            
+            <View style={{ marginBottom: 16 }}>
+              <Text style={styles.summaryLabel}>疲労度 (1: 元気 〜 5: 疲労困憊)</Text>
+              <View style={styles.conditionSlider}>
+                {[1, 2, 3, 4, 5].map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    onPress={() => setConditionInput({ ...conditionInput, fatigueLevel: val })}
+                    style={[styles.conditionButton, conditionInput.fatigueLevel === val && styles.conditionButtonActive]}
+                  >
+                    <Text style={[styles.conditionButtonText, conditionInput.fatigueLevel === val && styles.conditionButtonTextActive]}>{val}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={styles.summaryLabel}>筋肉痛 (1: なし 〜 5: ひどい)</Text>
+              <View style={styles.conditionSlider}>
+                {[1, 2, 3, 4, 5].map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    onPress={() => setConditionInput({ ...conditionInput, muscleSoreness: val })}
+                    style={[styles.conditionButton, conditionInput.muscleSoreness === val && styles.conditionButtonActive]}
+                  >
+                    <Text style={[styles.conditionButtonText, conditionInput.muscleSoreness === val && styles.conditionButtonTextActive]}>{val}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={styles.summaryLabel}>睡眠の質 (1: 悪い 〜 5: 良い)</Text>
+              <View style={styles.conditionSlider}>
+                {[1, 2, 3, 4, 5].map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    onPress={() => setConditionInput({ ...conditionInput, sleepQuality: val })}
+                    style={[styles.conditionButton, conditionInput.sleepQuality === val && styles.conditionButtonActive]}
+                  >
+                    <Text style={[styles.conditionButtonText, conditionInput.sleepQuality === val && styles.conditionButtonTextActive]}>{val}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={styles.summaryLabel}>モチベーション (1: 低い 〜 5: 高い)</Text>
+              <View style={styles.conditionSlider}>
+                {[1, 2, 3, 4, 5].map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    onPress={() => setConditionInput({ ...conditionInput, motivation: val })}
+                    style={[styles.conditionButton, conditionInput.motivation === val && styles.conditionButtonActive]}
+                  >
+                    <Text style={[styles.conditionButtonText, conditionInput.motivation === val && styles.conditionButtonTextActive]}>{val}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <Button variant="ghost" onPress={() => setShowConditionModal(false)} style={{ flex: 1 }}>
+                <Text style={styles.modalCancelText}>キャンセル</Text>
+              </Button>
+              <Button onPress={handleSaveCondition} style={{ flex: 1 }}>
+                <Text style={styles.authButtonText}>保存</Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -700,6 +913,9 @@ const WorkoutScreen = ({
   onBack,
   isLoading,
   onNavigate,
+  exerciseRecords,
+  onAddRecord,
+  onToggleFavorite,
 }: {
   plan: WorkoutPlan | null;
   onToggleExercise: (day: string, exerciseId: string) => void;
@@ -707,10 +923,78 @@ const WorkoutScreen = ({
   onBack: () => void;
   isLoading: boolean;
   onNavigate: (view: AppView) => void;
+  exerciseRecords: ExerciseRecord[];
+  onAddRecord: (record: Omit<ExerciseRecord, 'id' | 'date'>) => void;
+  onToggleFavorite: (day: string, exerciseId: string) => void;
 }) => {
+  const [showSetModal, setShowSetModal] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<{ day: string; exercise: Exercise } | null>(null);
+  const [setInput, setSetInput] = useState({ weight: '', reps: '' });
+  const [currentSets, setCurrentSets] = useState<any[]>([]);
+  const [restTimer, setRestTimer] = useState<number | null>(null);
+  const [restSeconds, setRestSeconds] = useState(0);
+
+  // 休憩タイマー
+  useEffect(() => {
+    let interval: any;
+    if (restTimer !== null && restSeconds > 0) {
+      interval = setInterval(() => {
+        setRestSeconds(prev => {
+          if (prev <= 1) {
+            setRestTimer(null);
+            Alert.alert('休憩終了', 'Next Setへ！');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [restTimer, restSeconds]);
+
   const openYoutube = (name: string) => {
     const query = encodeURIComponent(`${name} フォーム`);
     Linking.openURL(`https://www.youtube.com/results?search_query=${query}`);
+  };
+
+  const openSetTracker = (day: string, exercise: Exercise) => {
+    setSelectedExercise({ day, exercise });
+    setCurrentSets([]);
+    setSetInput({ weight: '', reps: '' });
+    setShowSetModal(true);
+  };
+
+  const addSet = () => {
+    if (!setInput.weight || !setInput.reps) return;
+    const newSet = {
+      setNumber: currentSets.length + 1,
+      weight: parseFloat(setInput.weight),
+      reps: parseInt(setInput.reps),
+      completedAt: new Date(),
+    };
+    setCurrentSets([...currentSets, newSet]);
+    setSetInput({ weight: '', reps: '' });
+    
+    // 休憩タイマー開始（60秒）
+    setRestTimer(Date.now());
+    setRestSeconds(60);
+  };
+
+  const saveExerciseRecord = () => {
+    if (!selectedExercise || currentSets.length === 0) return;
+    onAddRecord({
+      exerciseId: selectedExercise.exercise.id,
+      exerciseName: selectedExercise.exercise.name,
+      sets: currentSets,
+    });
+    onToggleExercise(selectedExercise.day, selectedExercise.exercise.id);
+    setShowSetModal(false);
+    Alert.alert('保存完了', 'トレーニング記録を保存しました！');
+  };
+
+  const getLastRecord = (exerciseId: string) => {
+    const records = exerciseRecords.filter(r => r.exerciseId === exerciseId).sort((a, b) => b.date.localeCompare(a.date));
+    return records[0] || null;
   };
 
   return (
@@ -752,33 +1036,112 @@ const WorkoutScreen = ({
               <Text style={styles.dayTitle}>{day.day}</Text>
               <Text style={styles.dayFocus}>{day.focus}</Text>
             </View>
-            {day.exercises.map((ex) => (
-              <View key={ex.id} style={styles.exerciseRow}>
-                <TouchableOpacity
-                  onPress={() => onToggleExercise(day.day, ex.id)}
-                  style={[styles.exerciseCheck, ex.isCompleted && styles.exerciseCheckDone]}
-                >
-                  {ex.isCompleted && <Icon name="check" size={16} color={COLORS.white} />}
-                </TouchableOpacity>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.exerciseName}>{ex.name}</Text>
-                  <Text style={styles.exerciseDesc}>{ex.description}</Text>
-                  <View style={styles.exerciseMeta}>
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>{ex.type}</Text>
+            {day.exercises.map((ex) => {
+              const lastRecord = getLastRecord(ex.id);
+              return (
+                <View key={ex.id} style={styles.exerciseRow}>
+                  <TouchableOpacity
+                    onPress={() => onToggleExercise(day.day, ex.id)}
+                    style={[styles.exerciseCheck, ex.isCompleted && styles.exerciseCheckDone]}
+                  >
+                    {ex.isCompleted && <Icon name="check" size={16} color={COLORS.white} />}
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.exerciseName}>{ex.name}</Text>
+                      <TouchableOpacity onPress={() => onToggleFavorite(day.day, ex.id)}>
+                        <Icon name={ex.isFavorite ? "star" : "star-outline"} size={16} color={COLORS.primary[600]} />
+                      </TouchableOpacity>
                     </View>
-                    <Text style={styles.exerciseDuration}>{ex.duration}</Text>
+                    <Text style={styles.exerciseDesc}>{ex.description}</Text>
+                    {lastRecord && (
+                      <Text style={[styles.exerciseDesc, { color: COLORS.accent[500], fontWeight: '600' }]}>
+                        前回: {lastRecord.sets.map(s => `${s.weight}kg×${s.reps}`).join(', ')}
+                      </Text>
+                    )}
+                    <View style={styles.exerciseMeta}>
+                      <View style={styles.tag}>
+                        <Text style={styles.tagText}>{ex.type}</Text>
+                      </View>
+                      <Text style={styles.exerciseDuration}>{ex.duration}</Text>
+                    </View>
+                  </View>
+                  <View style={{ gap: 4 }}>
+                    <TouchableOpacity onPress={() => openSetTracker(day.day, ex)} style={styles.youtubeButton}>
+                      <Icon name="weight-lifter" size={20} color={COLORS.primary[600]} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => openYoutube(ex.name)} style={styles.youtubeButton}>
+                      <Icon name="youtube" size={20} color={COLORS.accent[500]} />
+                    </TouchableOpacity>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => openYoutube(ex.name)} style={styles.youtubeButton}>
-                  <Icon name="youtube" size={20} color={COLORS.accent[500]} />
-                </TouchableOpacity>
-              </View>
-            ))}
+              );
+            })}
           </Card>
         ))}
       </ScrollView>
       <BottomNav current={AppView.Workout} onNavigate={onNavigate} />
+
+      {/* セット記録モーダル */}
+      <Modal
+        visible={showSetModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSetModal(false)}
+      >
+        <View style={styles.modalOverlaySimple}>
+          <View style={styles.modalContentSimple}>
+            <Text style={styles.sectionTitle}>{selectedExercise?.exercise.name}</Text>
+            <Text style={styles.sectionSubtitle}>セットを記録</Text>
+
+            {currentSets.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                {currentSets.map((set, idx) => (
+                  <Text key={idx} style={styles.exerciseDesc}>
+                    Set {set.setNumber}: {set.weight}kg × {set.reps}回
+                  </Text>
+                ))}
+              </View>
+            )}
+
+            {restTimer !== null && restSeconds > 0 && (
+              <View style={[styles.badge, { backgroundColor: COLORS.accent[100], marginBottom: 12 }]}>
+                <Icon name="timer-sand" size={16} color={COLORS.accent[600]} />
+                <Text style={[styles.badgeText, { color: COLORS.accent[600] }]}>休憩: {restSeconds}秒</Text>
+              </View>
+            )}
+
+            <Input
+              label="重量 (kg)"
+              placeholder="例: 50"
+              value={setInput.weight}
+              onChangeText={(text) => setSetInput({ ...setInput, weight: text })}
+              keyboardType="numeric"
+            />
+            <Input
+              label="回数"
+              placeholder="例: 10"
+              value={setInput.reps}
+              onChangeText={(text) => setSetInput({ ...setInput, reps: text })}
+              keyboardType="numeric"
+            />
+
+            <Button onPress={addSet} style={{ marginBottom: 12 }}>
+              <Icon name="plus" size={18} color={COLORS.white} />
+              <Text style={styles.authButtonText}>セットを追加</Text>
+            </Button>
+
+            <View style={styles.modalActions}>
+              <Button variant="ghost" onPress={() => setShowSetModal(false)} style={{ flex: 1 }}>
+                <Text style={styles.modalCancelText}>キャンセル</Text>
+              </Button>
+              <Button onPress={saveExerciseRecord} disabled={currentSets.length === 0} style={{ flex: 1 }}>
+                <Text style={styles.authButtonText}>保存</Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -884,6 +1247,7 @@ const ProgressScreen = ({
   dietLogs,
   targetCalories,
   onNavigate,
+  exerciseRecords,
 }: {
   weightLogs: WeightLog[];
   profile: UserProfile;
@@ -892,12 +1256,89 @@ const ProgressScreen = ({
   dietLogs: DietLog[];
   targetCalories: number;
   onNavigate: (view: AppView) => void;
+  exerciseRecords: ExerciseRecord[];
 }) => {
   const [weightInput, setWeightInput] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  
   const sortedLogs = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date));
   const chartWidth = Dimensions.get('window').width - 40;
   const chartData = sortedLogs.slice(-7);
   const weightDelta = (sortedLogs.at(-1)?.weight ?? profile.weight) - profile.targetWeight;
+
+  // カレンダーデータ（トレーニング実施日）
+  const calendarData = useMemo(() => {
+    const workoutDates = new Set(exerciseRecords.map(r => r.date));
+    return workoutDates;
+  }, [exerciseRecords]);
+
+  // 月間カレンダー日付生成
+  const monthDays = useMemo(() => {
+    const firstDay = new Date(selectedYear, selectedMonth, 1);
+    const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
+    const days = [];
+    
+    // 月初の曜日まで空白
+    for (let i = 0; i < firstDay.getDay(); i++) {
+      days.push(null);
+    }
+    
+    // 日付追加
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      days.push(i);
+    }
+    
+    return days;
+  }, [selectedMonth, selectedYear]);
+
+  // 週次サマリー（過去7日）
+  const weeklySummary = useMemo(() => {
+    const last7Days = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      last7Days.push(date.toISOString().split('T')[0]);
+    }
+    
+    const records = exerciseRecords.filter(r => last7Days.includes(r.date));
+    const totalSets = records.reduce((sum, r) => sum + r.sets.length, 0);
+    const totalVolume = records.reduce((sum, r) => 
+      sum + r.sets.reduce((setSum, s) => setSum + (s.weight * s.reps), 0), 0
+    );
+    
+    return { totalSets, totalVolume, workoutDays: records.length };
+  }, [exerciseRecords]);
+
+  // 月次サマリー
+  const monthlySummary = useMemo(() => {
+    const monthStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+    const records = exerciseRecords.filter(r => r.date.startsWith(monthStr));
+    const totalSets = records.reduce((sum, r) => sum + r.sets.length, 0);
+    const totalVolume = records.reduce((sum, r) => 
+      sum + r.sets.reduce((setSum, s) => setSum + (s.weight * s.reps), 0), 0
+    );
+    
+    return { totalSets, totalVolume, workoutDays: records.length };
+  }, [exerciseRecords, selectedMonth, selectedYear]);
+
+  // 筋力推移データ（種目別の最大重量）
+  const strengthProgress = useMemo(() => {
+    const byExercise = new Map<string, { date: string; maxWeight: number }[]>();
+    
+    exerciseRecords.forEach(record => {
+      if (!byExercise.has(record.exerciseName)) {
+        byExercise.set(record.exerciseName, []);
+      }
+      const maxWeight = Math.max(...record.sets.map(s => s.weight));
+      byExercise.get(record.exerciseName)!.push({ date: record.date, maxWeight });
+    });
+    
+    return Array.from(byExercise.entries()).map(([name, data]) => ({
+      exerciseName: name,
+      data: data.sort((a, b) => a.date.localeCompare(b.date)).slice(-7),
+    }));
+  }, [exerciseRecords]);
 
   const recentDates = chartData.map((l) => l.date);
   const dietByDate = useMemo(() => {
@@ -1021,6 +1462,115 @@ const ProgressScreen = ({
             </View>
           )}
         </Card>
+
+        {/* カレンダービュー */}
+        <Card>
+          <Text style={styles.sectionTitle}>トレーニングカレンダー</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <TouchableOpacity onPress={() => {
+              if (selectedMonth === 0) {
+                setSelectedMonth(11);
+                setSelectedYear(selectedYear - 1);
+              } else {
+                setSelectedMonth(selectedMonth - 1);
+              }
+            }}>
+              <Icon name="chevron-left" size={24} color={COLORS.primary[600]} />
+            </TouchableOpacity>
+            <Text style={styles.summaryLabel}>{selectedYear}年 {selectedMonth + 1}月</Text>
+            <TouchableOpacity onPress={() => {
+              if (selectedMonth === 11) {
+                setSelectedMonth(0);
+                setSelectedYear(selectedYear + 1);
+              } else {
+                setSelectedMonth(selectedMonth + 1);
+              }
+            }}>
+              <Icon name="chevron-right" size={24} color={COLORS.primary[600]} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.calendarGrid}>
+            {['日', '月', '火', '水', '木', '金', '土'].map((day) => (
+              <Text key={day} style={styles.calendarHeader}>{day}</Text>
+            ))}
+            {monthDays.map((day, idx) => {
+              const dateStr = day ? `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
+              const hasWorkout = day && calendarData.has(dateStr);
+              return (
+                <View key={idx} style={[styles.calendarDay, hasWorkout && styles.calendarDayActive]}>
+                  {day && <Text style={[styles.calendarDayText, hasWorkout && styles.calendarDayTextActive]}>{day}</Text>}
+                </View>
+              );
+            })}
+          </View>
+        </Card>
+
+        {/* 週次・月次サマリー */}
+        <View style={styles.gridRow}>
+          <Card style={[styles.gridCardHalf]}>
+            <Text style={styles.cardLabelSmall}>週次サマリー (過去7日)</Text>
+            <View style={{ marginTop: 8 }}>
+              <Text style={styles.summaryLabel}>トレーニング日数</Text>
+              <Text style={styles.summaryValue}>{weeklySummary.workoutDays}日</Text>
+            </View>
+            <View style={{ marginTop: 8 }}>
+              <Text style={styles.summaryLabel}>総セット数</Text>
+              <Text style={styles.summaryValue}>{weeklySummary.totalSets}セット</Text>
+            </View>
+            <View style={{ marginTop: 8 }}>
+              <Text style={styles.summaryLabel}>総ボリューム</Text>
+              <Text style={styles.summaryValue}>{weeklySummary.totalVolume.toLocaleString()}kg</Text>
+            </View>
+          </Card>
+
+          <Card style={[styles.gridCardHalf]}>
+            <Text style={styles.cardLabelSmall}>月次サマリー ({selectedMonth + 1}月)</Text>
+            <View style={{ marginTop: 8 }}>
+              <Text style={styles.summaryLabel}>トレーニング日数</Text>
+              <Text style={styles.summaryValue}>{monthlySummary.workoutDays}日</Text>
+            </View>
+            <View style={{ marginTop: 8 }}>
+              <Text style={styles.summaryLabel}>総セット数</Text>
+              <Text style={styles.summaryValue}>{monthlySummary.totalSets}セット</Text>
+            </View>
+            <View style={{ marginTop: 8 }}>
+              <Text style={styles.summaryLabel}>総ボリューム</Text>
+              <Text style={styles.summaryValue}>{monthlySummary.totalVolume.toLocaleString()}kg</Text>
+            </View>
+          </Card>
+        </View>
+
+        {/* 筋力推移グラフ */}
+        {strengthProgress.length > 0 && strengthProgress.slice(0, 3).map((exercise) => (
+          <Card key={exercise.exerciseName}>
+            <Text style={styles.sectionTitle}>{exercise.exerciseName} 最大重量推移</Text>
+            {exercise.data.length === 0 ? (
+              <Text style={styles.sectionSubtitle}>まだデータがありません。</Text>
+            ) : (
+              <View style={styles.chartContainer}>
+                <LineChart
+                  data={{
+                    labels: exercise.data.map((d) => d.date.slice(5)),
+                    datasets: [{ data: exercise.data.map((d) => d.maxWeight) }],
+                  }}
+                  width={chartWidth}
+                  height={180}
+                  chartConfig={{
+                    backgroundColor: COLORS.white,
+                    backgroundGradientFrom: COLORS.white,
+                    backgroundGradientTo: COLORS.white,
+                    color: (opacity = 1) => `rgba(67, 56, 202, ${opacity})`,
+                    labelColor: () => COLORS.surface[500],
+                    propsForDots: { r: '4' },
+                  }}
+                  bezier
+                  style={{ borderRadius: 16 }}
+                />
+              </View>
+            )}
+          </Card>
+        ))}
       </ScrollView>
       <BottomNav current={AppView.Progress} onNavigate={onNavigate} />
     </SafeAreaView>
@@ -1103,6 +1653,11 @@ const App = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editProfileState, setEditProfileState] = useState<Partial<UserProfile> | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  
+  // 新機能用のstate
+  const [conditionLogs, setConditionLogs] = useState<ConditionLog[]>([]);
+  const [exerciseRecords, setExerciseRecords] = useState<ExerciseRecord[]>([]);
+  const [restTimer, setRestTimer] = useState<{ exerciseId: string; seconds: number; isActive: boolean } | null>(null);
 
   const targetCalories = useMemo(
     () => workoutPlan?.recommendedCalories ?? 2000,
@@ -1176,6 +1731,16 @@ const App = () => {
         if (parsed.date === todayDate()) {
           setDailyMessage(parsed.text);
         }
+      }
+
+      const savedCondition = await AsyncStorage.getItem(STORAGE_KEYS.conditionLogs);
+      if (savedCondition) {
+        setConditionLogs(JSON.parse(savedCondition));
+      }
+
+      const savedRecords = await AsyncStorage.getItem(STORAGE_KEYS.exerciseRecords);
+      if (savedRecords) {
+        setExerciseRecords(JSON.parse(savedRecords));
       }
     } catch (error) {
       console.error('Failed to load app data:', error);
@@ -1289,6 +1854,49 @@ const App = () => {
     await AsyncStorage.setItem(STORAGE_KEYS.weightLogs, JSON.stringify(updated));
   };
 
+  const addConditionLog = async (condition: Omit<ConditionLog, 'id' | 'date'>) => {
+    const log: ConditionLog = {
+      id: `${Date.now()}`,
+      date: todayDate(),
+      ...condition,
+    };
+    const updated = [...conditionLogs, log];
+    setConditionLogs(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.conditionLogs, JSON.stringify(updated));
+  };
+
+  const addExerciseRecord = async (record: Omit<ExerciseRecord, 'id' | 'date'>) => {
+    const newRecord: ExerciseRecord = {
+      id: `${Date.now()}`,
+      date: todayDate(),
+      ...record,
+    };
+    const updated = [...exerciseRecords, newRecord];
+    setExerciseRecords(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.exerciseRecords, JSON.stringify(updated));
+  };
+
+  const toggleFavoriteExercise = async (dayLabel: string, exerciseId: string) => {
+    setWorkoutPlan((prev) => {
+      if (!prev) return prev;
+      const next: WorkoutPlan = {
+        ...prev,
+        schedule: prev.schedule.map((day) =>
+          day.day === dayLabel
+            ? {
+                ...day,
+                exercises: day.exercises.map((ex) =>
+                  ex.id === exerciseId ? { ...ex, isFavorite: !ex.isFavorite } : ex
+                ),
+              }
+            : day
+        ),
+      };
+      AsyncStorage.setItem(STORAGE_KEYS.workoutPlan, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const refreshDailyMessage = async () => {
     if (!profile) return;
     setIsMessageLoading(true);
@@ -1314,12 +1922,16 @@ const App = () => {
       STORAGE_KEYS.dietLogs,
       STORAGE_KEYS.weightLogs,
       STORAGE_KEYS.dailyMessage,
+      STORAGE_KEYS.conditionLogs,
+      STORAGE_KEYS.exerciseRecords,
     ]);
     setProfile(null);
     setWorkoutPlan(null);
     setDietLogs([]);
     setWeightLogs([]);
     setDailyMessage(null);
+    setConditionLogs([]);
+    setExerciseRecords([]);
     setView(AppView.Auth);
   };
 
@@ -1396,6 +2008,9 @@ const App = () => {
           dailyMessage={dailyMessage}
           onRefreshMessage={refreshDailyMessage}
           isRefreshingMessage={isMessageLoading}
+          conditionLogs={conditionLogs}
+          onAddCondition={addConditionLog}
+          exerciseRecords={exerciseRecords}
         />
       )}
 
@@ -1407,6 +2022,9 @@ const App = () => {
           onBack={() => setView(AppView.Dashboard)}
           isLoading={isPlanLoading}
           onNavigate={setView}
+          exerciseRecords={exerciseRecords}
+          onAddRecord={addExerciseRecord}
+          onToggleFavorite={toggleFavoriteExercise}
         />
       )}
 
@@ -1430,6 +2048,7 @@ const App = () => {
           targetCalories={targetCalories}
           onBack={() => setView(AppView.Dashboard)}
           onNavigate={setView}
+          exerciseRecords={exerciseRecords}
         />
       )}
 
@@ -2185,6 +2804,66 @@ const styles = StyleSheet.create({
   modalError: {
     color: '#ef4444',
     fontWeight: '700',
+  },
+
+  // Condition Input
+  conditionSlider: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  conditionButton: {
+    flex: 1,
+    paddingVertical: 12,
+    backgroundColor: COLORS.surface[100],
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  conditionButtonActive: {
+    backgroundColor: COLORS.primary[600],
+  },
+  conditionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.surface[600],
+  },
+  conditionButtonTextActive: {
+    color: COLORS.white,
+  },
+
+  // Calendar
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  calendarHeader: {
+    width: '13%',
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.surface[500],
+    marginBottom: 8,
+  },
+  calendarDay: {
+    width: '13%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDayActive: {
+    backgroundColor: COLORS.primary[600],
+  },
+  calendarDayText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.surface[600],
+  },
+  calendarDayTextActive: {
+    color: COLORS.white,
   },
 });
 

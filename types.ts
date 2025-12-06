@@ -25,6 +25,36 @@ export interface Exercise {
   duration: string;
   description: string;
   isCompleted?: boolean; // New: Tracking status
+  isFavorite?: boolean; // お気に入り
+  videoUrl?: string; // YouTube URL
+}
+
+// セット記録
+export interface ExerciseSet {
+  setNumber: number;
+  weight: number; // kg
+  reps: number; // 回数
+  completedAt: Date;
+}
+
+// エクササイズ実施記録
+export interface ExerciseRecord {
+  id: string;
+  exerciseId: string;
+  exerciseName: string;
+  date: string; // YYYY-MM-DD
+  sets: ExerciseSet[];
+  notes?: string;
+}
+
+// コンディション記録
+export interface ConditionLog {
+  id: string;
+  date: string; // YYYY-MM-DD
+  fatigueLevel: number; // 1-5 (1: 元気, 5: 疲労困憊)
+  muscleSoreness: number; // 1-5 (1: なし, 5: ひどい)
+  sleepQuality: number; // 1-5 (1: 悪い, 5: 良い)
+  motivation: number; // 1-5 (1: 低い, 5: 高い)
 }
 
 export interface DailyWorkout {
