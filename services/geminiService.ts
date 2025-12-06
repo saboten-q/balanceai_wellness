@@ -3,8 +3,15 @@ import { UserProfile, WorkoutPlan, DietLog } from "../types";
 
 // Expo環境変数の取得
 const getApiKey = () => {
-  // 開発時は直接APIキーを設定（本番では環境変数から取得）
-  return "YOUR_GEMINI_API_KEY_HERE"; // ここにAPIキーを設定してください
+  const key =
+    process.env.EXPO_PUBLIC_API_KEY ||
+    process.env.API_KEY ||
+    process.env.VITE_API_KEY ||
+    "YOUR_GEMINI_API_KEY_HERE";
+  if (!key || key.includes("YOUR_GEMINI_API_KEY_HERE")) {
+    console.warn("Gemini API Key is not set. Using placeholder; API calls will fail.");
+  }
+  return key;
 };
 
 const genAI = new GoogleGenerativeAI(getApiKey());

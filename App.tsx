@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,17 @@ import {
   Alert,
   Platform,
   Animated,
+  KeyboardAvoidingView,
+  Linking,
+  Dimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { Button, Card, Input, Select } from './components/UIComponents';
-import { UserProfile, Gender, AppView } from './types';
+import { UserProfile, Gender, AppView, WorkoutPlan, DietLog, WeightLog, Exercise } from './types';
+import { generateWorkoutPlan, analyzeFoodImage, generateDailyEncouragement } from './services/geminiService';
+import { LineChart } from 'react-native-chart-kit';
 
 // Web用のフォールバックコンポーネント
 const GradientView = ({ colors, start, end, style, children }: any) => {
@@ -67,6 +72,79 @@ const COLORS = {
   white: '#ffffff',
   green: '#22c55e',
 };
+
+const FALLBACK_PLAN: WorkoutPlan = {
+  summary: '自宅でも続けやすい7日間の全身バランスプランです。無理なくフォーム重視で進めましょう。',
+  recommendedCalories: 1900,
+  schedule: [
+    {
+      day: '月曜日',
+      focus: '上半身',
+      exercises: [
+        { id: 'mon-1', name: 'プッシュアップ', type: 'Strength', duration: '10分', description: '膝つきOK。胸と腕を意識。', isCompleted: false },
+        { id: 'mon-2', name: 'サイドレイズ', type: 'Strength', duration: '8分', description: 'ペットボトルでも可。肩を痛めない範囲で。', isCompleted: false },
+      ],
+    },
+    {
+      day: '火曜日',
+      focus: '下半身',
+      exercises: [
+        { id: 'tue-1', name: 'スクワット', type: 'Strength', duration: '12分', description: 'お尻を引いて膝を内側に入れない。', isCompleted: false },
+        { id: 'tue-2', name: 'ヒップリフト', type: 'Strength', duration: '8分', description: 'お尻の収縮を意識。', isCompleted: false },
+      ],
+    },
+    {
+      day: '水曜日',
+      focus: '有酸素',
+      exercises: [
+        { id: 'wed-1', name: '早歩き/ジョグ', type: 'Cardio', duration: '15-20分', description: '会話できる強度を目安に。', isCompleted: false },
+        { id: 'wed-2', name: 'ジャンピングジャック', type: 'Cardio', duration: '5分', description: '膝に不安がある場合はスローペースで。', isCompleted: false },
+      ],
+    },
+    {
+      day: '木曜日',
+      focus: '体幹',
+      exercises: [
+        { id: 'thu-1', name: 'プランク', type: 'Strength', duration: '3 x 30秒', description: '腰が落ちないように一直線。', isCompleted: false },
+        { id: 'thu-2', name: 'バードドッグ', type: 'Strength', duration: '8分', description: '左右交互に体幹安定を意識。', isCompleted: false },
+      ],
+    },
+    {
+      day: '金曜日',
+      focus: '上半身2',
+      exercises: [
+        { id: 'fri-1', name: 'インクラインプッシュアップ', type: 'Strength', duration: '10分', description: '台を使い角度をつけて負荷調整。', isCompleted: false },
+        { id: 'fri-2', name: 'ワイドロー（タオル）', type: 'Strength', duration: '8分', description: '肩甲骨を寄せて背中を意識。', isCompleted: false },
+      ],
+    },
+    {
+      day: '土曜日',
+      focus: '下半身2',
+      exercises: [
+        { id: 'sat-1', name: 'ランジ', type: 'Strength', duration: '10分', description: '膝がつま先より出すぎないように。', isCompleted: false },
+        { id: 'sat-2', name: 'カーフレイズ', type: 'Strength', duration: '6分', description: 'ふくらはぎをしっかり収縮。', isCompleted: false },
+      ],
+    },
+    {
+      day: '日曜日',
+      focus: 'リカバリー',
+      exercises: [
+        { id: 'sun-1', name: 'ストレッチ（全身）', type: 'Flexibility', duration: '10-15分', description: '呼吸を止めずに気持ちよく。', isCompleted: false },
+        { id: 'sun-2', name: '軽いウォーキング', type: 'Cardio', duration: '15分', description: 'リラックス目的でOK。', isCompleted: false },
+      ],
+    },
+  ],
+};
+
+const STORAGE_KEYS = {
+  profile: 'profile',
+  workoutPlan: 'workoutPlan',
+  dietLogs: 'dietLogs',
+  weightLogs: 'weightLogs',
+  dailyMessage: 'dailyMessage',
+};
+
+const todayDate = () => new Date().toISOString().split('T')[0];
 
 // --- Auth Screen ---
 const AuthScreen = ({ onNavigate, onLoginSuccess }: { 
@@ -417,11 +495,28 @@ const Onboarding = ({ onComplete }: { onComplete: (profile: UserProfile) => void
 // --- Dashboard Screen ---
 const Dashboard = ({ 
   profile, 
-  onNavigate 
+  onNavigate,
+  workoutPlan,
+  todayCalories,
+  targetCalories,
+  dailyMessage,
+  onRefreshMessage,
+  isRefreshingMessage,
 }: { 
   profile: UserProfile;
   onNavigate: (view: AppView) => void;
+  workoutPlan: WorkoutPlan | null;
+  todayCalories: number;
+  targetCalories: number;
+  dailyMessage: string | null;
+  onRefreshMessage: () => void;
+  isRefreshingMessage: boolean;
 }) => {
+  const todayIndex = new Date().getDay(); // 0:Sun
+  const todayPlan = workoutPlan?.schedule?.[todayIndex] || workoutPlan?.schedule?.[0];
+  const completedCount = todayPlan ? todayPlan.exercises.filter((e) => e.isCompleted).length : 0;
+  const totalCount = todayPlan?.exercises.length || 0;
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.dashboardContent}>
@@ -450,9 +545,12 @@ const Dashboard = ({
           <View style={styles.dailyMessageContent}>
             <Text style={styles.dailyMessageLabel}>DAILY BOOST ✨</Text>
             <Text style={styles.dailyMessageText}>
-              🌟 今日も一歩ずつ。小さな積み重ねが大きな変化をつくります！
+              {dailyMessage || '今日も一歩ずつ。小さな積み重ねが大きな変化をつくります！'}
             </Text>
           </View>
+          <TouchableOpacity onPress={onRefreshMessage} style={styles.refreshButton}>
+            <Text style={styles.refreshText}>{isRefreshingMessage ? '更新中...' : '更新'}</Text>
+          </TouchableOpacity>
         </Card>
 
         <Card onPress={() => onNavigate(AppView.Workout)} style={styles.workoutCard}>
@@ -462,8 +560,12 @@ const Dashboard = ({
             </View>
             <Text style={styles.cardLabelSmall}>Workout</Text>
           </View>
-          <Text style={styles.workoutFocus}>今日のトレーニング 💪</Text>
-          <Text style={styles.workoutSubtext}>タップして詳細を見る</Text>
+          <Text style={styles.workoutFocus}>
+            {todayPlan ? `${todayPlan.day} | ${todayPlan.focus}` : 'プラン未生成'}
+          </Text>
+          <Text style={styles.workoutSubtext}>
+            {totalCount ? `完了 ${completedCount}/${totalCount}` : 'タップして詳細を見る'}
+          </Text>
           <View style={styles.workoutAction}>
             <Text style={styles.workoutActionText}>詳細を見る</Text>
             <Icon name="arrow-right" size={16} color={COLORS.primary[600]} />
@@ -483,8 +585,10 @@ const Dashboard = ({
               </View>
               <View style={styles.dietCardContent}>
                 <Text style={styles.cardLabelSmall}>Nutrition</Text>
-                <Text style={styles.dietCalories}>🥗 食事を記録しましょう</Text>
-                <Text style={styles.dietSubtext}>今日のカロリー: 0 kcal</Text>
+                <Text style={styles.dietCalories}>本日のカロリー</Text>
+                <Text style={styles.dietSubtext}>
+                  {todayCalories} / {targetCalories} kcal
+                </Text>
               </View>
             </View>
             <View style={styles.workoutAction}>
@@ -530,16 +634,373 @@ const Dashboard = ({
   );
 };
 
-// --- Placeholder Screens ---
-const PlaceholderScreen = ({ title }: { title: string }) => (
-  <SafeAreaView style={styles.container}>
-    <View style={styles.placeholderContainer}>
-      <Icon name={"construction" as any} size={64} color={COLORS.surface[300]} />
-      <Text style={styles.placeholderTitle}>{title}</Text>
-      <Text style={styles.placeholderText}>この画面は現在開発中です</Text>
-    </View>
-  </SafeAreaView>
-);
+// --- Workout Screen ---
+const WorkoutScreen = ({
+  plan,
+  onToggleExercise,
+  onRegenerate,
+  onBack,
+  isLoading,
+}: {
+  plan: WorkoutPlan | null;
+  onToggleExercise: (day: string, exerciseId: string) => void;
+  onRegenerate: () => void;
+  onBack: () => void;
+  isLoading: boolean;
+}) => {
+  const openYoutube = (name: string) => {
+    const query = encodeURIComponent(`${name} フォーム`);
+    Linking.openURL(`https://www.youtube.com/results?search_query=${query}`);
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.dashboardContent}>
+        <View style={styles.screenHeader}>
+          <Text style={styles.screenTitle}>ワークアウト</Text>
+          <TouchableOpacity onPress={onBack} style={styles.backChip}>
+            <Icon name="arrow-left" size={18} color={COLORS.surface[900]} />
+            <Text style={styles.backChipText}>戻る</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Card>
+          <Text style={styles.sectionTitle}>週間プラン</Text>
+          <Text style={styles.sectionSubtitle}>{plan?.summary || 'プランを生成してください。'}</Text>
+          <View style={styles.badgeRow}>
+            <View style={styles.badge}>
+              <Icon name="fire" size={16} color={COLORS.primary[600]} />
+              <Text style={styles.badgeText}>
+                目安カロリー {plan?.recommendedCalories || 2000} kcal
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onRegenerate} style={styles.textButton}>
+              <Text style={styles.textButtonLabel}>{isLoading ? '生成中...' : 'プラン再生成'}</Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
+
+        {!plan && (
+          <Card>
+            <Text style={styles.sectionSubtitle}>まだプランがありません。ボタンを押して生成します。</Text>
+          </Card>
+        )}
+
+        {plan?.schedule.map((day) => (
+          <Card key={day.day}>
+            <View style={styles.dayHeader}>
+              <Text style={styles.dayTitle}>{day.day}</Text>
+              <Text style={styles.dayFocus}>{day.focus}</Text>
+            </View>
+            {day.exercises.map((ex) => (
+              <View key={ex.id} style={styles.exerciseRow}>
+                <TouchableOpacity
+                  onPress={() => onToggleExercise(day.day, ex.id)}
+                  style={[styles.exerciseCheck, ex.isCompleted && styles.exerciseCheckDone]}
+                >
+                  {ex.isCompleted && <Icon name="check" size={16} color={COLORS.white} />}
+                </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.exerciseName}>{ex.name}</Text>
+                  <Text style={styles.exerciseDesc}>{ex.description}</Text>
+                  <View style={styles.exerciseMeta}>
+                    <View style={styles.tag}>
+                      <Text style={styles.tagText}>{ex.type}</Text>
+                    </View>
+                    <Text style={styles.exerciseDuration}>{ex.duration}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => openYoutube(ex.name)} style={styles.youtubeButton}>
+                  <Icon name="youtube" size={20} color={COLORS.accent[500]} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </Card>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+// --- Diet Screen ---
+const DietScreen = ({
+  logs,
+  targetCalories,
+  onAddLog,
+  onBack,
+  isLoading,
+}: {
+  logs: DietLog[];
+  targetCalories: number;
+  onAddLog: (description: string) => void;
+  onBack: () => void;
+  isLoading: boolean;
+}) => {
+  const [text, setText] = useState('');
+
+  const todayTotal = useMemo(() => {
+    const today = todayDate();
+    return logs
+      .filter((log) => new Date(log.timestamp).toISOString().startsWith(today))
+      .reduce((sum, log) => sum + (log.macros?.calories || 0), 0);
+  }, [logs]);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.dashboardContent}>
+          <View style={styles.screenHeader}>
+            <Text style={styles.screenTitle}>食事ログ</Text>
+            <TouchableOpacity onPress={onBack} style={styles.backChip}>
+              <Icon name="arrow-left" size={18} color={COLORS.surface[900]} />
+              <Text style={styles.backChipText}>戻る</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Card>
+            <Text style={styles.sectionTitle}>今日のカロリー</Text>
+            <Text style={styles.sectionSubtitle}>
+              {todayTotal} / {targetCalories} kcal
+            </Text>
+            <Input
+              label="食事内容をテキストで入力"
+              placeholder="例: サラダチキンとおにぎり1個"
+              value={text}
+              onChangeText={setText}
+              multiline
+              numberOfLines={3}
+            />
+            <Button
+              onPress={() => {
+                if (!text.trim()) return;
+                onAddLog(text.trim());
+                setText('');
+              }}
+              isLoading={isLoading}
+              disabled={isLoading || !text.trim()}
+              style={{ marginTop: 12 }}
+            >
+              <Text style={styles.authButtonText}>AIで栄養分析して記録</Text>
+            </Button>
+          </Card>
+
+          {logs.length === 0 && (
+            <Card>
+              <Text style={styles.sectionSubtitle}>まだ記録がありません。今日の食事を登録しましょう。</Text>
+            </Card>
+          )}
+
+          {logs.map((log) => (
+            <Card key={log.id}>
+              <View style={styles.logHeader}>
+                <Text style={styles.exerciseName}>{log.foodName}</Text>
+                <Text style={styles.logDate}>{new Date(log.timestamp).toLocaleString()}</Text>
+              </View>
+              <View style={styles.macrosRow}>
+                <View style={styles.macroChip}><Text style={styles.macroLabel}>kcal</Text><Text style={styles.macroValue}>{log.macros.calories}</Text></View>
+                <View style={styles.macroChip}><Text style={styles.macroLabel}>P</Text><Text style={styles.macroValue}>{log.macros.protein}g</Text></View>
+                <View style={styles.macroChip}><Text style={styles.macroLabel}>F</Text><Text style={styles.macroValue}>{log.macros.fat}g</Text></View>
+                <View style={styles.macroChip}><Text style={styles.macroLabel}>C</Text><Text style={styles.macroValue}>{log.macros.carbs}g</Text></View>
+              </View>
+              <Text style={styles.logAdvice}>{log.advice}</Text>
+            </Card>
+          ))}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
+// --- Progress Screen ---
+const ProgressScreen = ({
+  weightLogs,
+  profile,
+  onAddWeight,
+  onBack,
+  dietLogs,
+  targetCalories,
+}: {
+  weightLogs: WeightLog[];
+  profile: UserProfile;
+  onAddWeight: (weight: number) => void;
+  onBack: () => void;
+  dietLogs: DietLog[];
+  targetCalories: number;
+}) => {
+  const [weightInput, setWeightInput] = useState('');
+  const sortedLogs = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date));
+  const chartWidth = Dimensions.get('window').width - 40;
+  const chartData = sortedLogs.slice(-7);
+  const weightDelta = (sortedLogs.at(-1)?.weight ?? profile.weight) - profile.targetWeight;
+
+  const recentDates = chartData.map((l) => l.date);
+  const dietByDate = useMemo(() => {
+    const map = new Map<string, { calories: number; protein: number; fat: number; carbs: number }>();
+    dietLogs.forEach((log) => {
+      const date = new Date(log.timestamp).toISOString().split('T')[0];
+      if (!map.has(date)) {
+        map.set(date, { calories: 0, protein: 0, fat: 0, carbs: 0 });
+      }
+      const agg = map.get(date)!;
+      agg.calories += log.macros.calories || 0;
+      agg.protein += log.macros.protein || 0;
+      agg.fat += log.macros.fat || 0;
+      agg.carbs += log.macros.carbs || 0;
+    });
+    return map;
+  }, [dietLogs]);
+
+  const pfcDates = recentDates.length ? recentDates : [todayDate()];
+  const pfcData = pfcDates.map((d) => dietByDate.get(d) || { calories: 0, protein: 0, fat: 0, carbs: 0 });
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.dashboardContent}>
+        <View style={styles.screenHeader}>
+          <Text style={styles.screenTitle}>進捗</Text>
+          <TouchableOpacity onPress={onBack} style={styles.backChip}>
+            <Icon name="arrow-left" size={18} color={COLORS.surface[900]} />
+            <Text style={styles.backChipText}>戻る</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Card>
+          <Text style={styles.sectionTitle}>体重を追加</Text>
+          <Input
+            label="現在の体重 (kg)"
+            placeholder="例: 68.5"
+            value={weightInput}
+            onChangeText={setWeightInput}
+            keyboardType="numeric"
+          />
+          <Button
+            onPress={() => {
+              const val = parseFloat(weightInput);
+              if (!val) return;
+              onAddWeight(val);
+              setWeightInput('');
+            }}
+            style={{ marginTop: 12 }}
+          >
+            <Text style={styles.authButtonText}>記録する</Text>
+          </Button>
+        </Card>
+
+        <Card>
+          <Text style={styles.sectionTitle}>体重の推移</Text>
+          <Text style={styles.sectionSubtitle}>
+            目標差分: {weightDelta >= 0 ? '+' : ''}{weightDelta.toFixed(1)} kg
+          </Text>
+          {chartData.length === 0 ? (
+            <Text style={styles.sectionSubtitle}>まだデータがありません。</Text>
+          ) : (
+            <View style={styles.chartContainer}>
+              <LineChart
+                data={{
+                  labels: chartData.map((l) => l.date.slice(5)),
+                  datasets: [
+                    { data: chartData.map((l) => l.weight), color: () => '#0ea5e9' },
+                    { data: chartData.map(() => profile.targetWeight), color: () => '#94a3b8' },
+                  ],
+                  legend: ['体重', '目標'],
+                }}
+                width={chartWidth}
+                height={220}
+                chartConfig={{
+                  backgroundColor: COLORS.white,
+                  backgroundGradientFrom: COLORS.white,
+                  backgroundGradientTo: COLORS.white,
+                  color: (opacity = 1) => `rgba(14,165,233,${opacity})`,
+                  labelColor: () => COLORS.surface[500],
+                  propsForDots: { r: '4' },
+                }}
+                bezier
+                style={{ borderRadius: 16 }}
+              />
+            </View>
+          )}
+        </Card>
+
+        <Card>
+          <Text style={styles.sectionTitle}>PFC / カロリー推移 (直近7日)</Text>
+          {pfcData.every((d) => d.calories === 0 && d.protein === 0 && d.fat === 0 && d.carbs === 0) ? (
+            <Text style={styles.sectionSubtitle}>まだ食事データがありません。</Text>
+          ) : (
+            <View style={styles.chartContainer}>
+              <LineChart
+                data={{
+                  labels: pfcDates.map((d) => d.slice(5)),
+                  datasets: [
+                    { data: pfcData.map((d) => d.calories), color: () => '#f97316' },
+                    { data: pfcData.map((d) => d.protein), color: () => '#22c55e' },
+                    { data: pfcData.map((d) => d.fat), color: () => '#0ea5e9' },
+                    { data: pfcData.map((d) => d.carbs), color: () => '#64748b' },
+                    { data: pfcData.map(() => targetCalories), color: () => '#94a3b8' },
+                  ],
+                  legend: ['kcal', 'P', 'F', 'C', '目標kcal'],
+                }}
+                width={chartWidth}
+                height={260}
+                chartConfig={{
+                  backgroundColor: COLORS.white,
+                  backgroundGradientFrom: COLORS.white,
+                  backgroundGradientTo: COLORS.white,
+                  color: (opacity = 1) => `rgba(100,116,139,${opacity})`,
+                  labelColor: () => COLORS.surface[500],
+                  propsForDots: { r: '3' },
+                }}
+                bezier
+                style={{ borderRadius: 16 }}
+              />
+            </View>
+          )}
+        </Card>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+// --- Settings Screen ---
+const SettingsScreen = ({
+  profile,
+  onReset,
+  onBack,
+}: {
+  profile: UserProfile;
+  onReset: () => void;
+  onBack: () => void;
+}) => {
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.dashboardContent}>
+        <View style={styles.screenHeader}>
+          <Text style={styles.screenTitle}>設定</Text>
+          <TouchableOpacity onPress={onBack} style={styles.backChip}>
+            <Icon name="arrow-left" size={18} color={COLORS.surface[900]} />
+            <Text style={styles.backChipText}>戻る</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Card>
+          <Text style={styles.sectionTitle}>プロフィール</Text>
+          <Text style={styles.sectionSubtitle}>名前: {profile.name}</Text>
+          <Text style={styles.sectionSubtitle}>目標: {profile.goal}</Text>
+          <Text style={styles.sectionSubtitle}>
+            体重: {profile.weight}kg / 目標 {profile.targetWeight}kg
+          </Text>
+        </Card>
+
+        <Card>
+          <Text style={styles.sectionTitle}>データリセット</Text>
+          <Text style={styles.sectionSubtitle}>保存済みのプロフィールと記録を削除します。</Text>
+          <Button onPress={onReset} variant="secondary" style={{ marginTop: 12 }}>
+            <Text style={[styles.authButtonTextSecondary, { color: COLORS.primary[600] }]}>リセットしてサインアウト</Text>
+          </Button>
+        </Card>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
 
 // --- Main App ---
 const App = () => {
@@ -547,9 +1008,26 @@ const App = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
+  const [dietLogs, setDietLogs] = useState<DietLog[]>([]);
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
+  const [dailyMessage, setDailyMessage] = useState<string | null>(null);
+  const [isPlanLoading, setIsPlanLoading] = useState(false);
+  const [isDietLoading, setIsDietLoading] = useState(false);
+  const [isMessageLoading, setIsMessageLoading] = useState(false);
+
+  const targetCalories = useMemo(
+    () => workoutPlan?.recommendedCalories ?? 2000,
+    [workoutPlan]
+  );
+  const todayCalories = useMemo(() => {
+    const today = todayDate();
+    return dietLogs
+      .filter((log) => new Date(log.timestamp).toISOString().startsWith(today))
+      .reduce((sum, log) => sum + (log.macros?.calories || 0), 0);
+  }, [dietLogs]);
 
   useEffect(() => {
-    // エラーハンドリングを追加
     const initApp = async () => {
       try {
         console.log('App initializing...');
@@ -567,37 +1045,195 @@ const App = () => {
   const loadProfile = async () => {
     try {
       console.log('Loading profile...');
-      const savedProfile = await AsyncStorage.getItem('profile');
+      const savedProfile = await AsyncStorage.getItem(STORAGE_KEYS.profile);
       console.log('Profile loaded:', savedProfile ? 'found' : 'not found');
       if (savedProfile) {
-        setProfile(JSON.parse(savedProfile));
-        setView(AppView.Dashboard);
+          const parsed = JSON.parse(savedProfile);
+          setProfile(parsed);
+          setView(AppView.Dashboard);
       }
+      setIsLoading(false);
     } catch (error) {
       console.error('Failed to load profile:', error);
-    } finally {
-      console.log('Setting isLoading to false');
       setIsLoading(false);
+    }
+  };
+
+  const loadAppData = async (p: UserProfile) => {
+    try {
+      const storedPlan = await AsyncStorage.getItem(STORAGE_KEYS.workoutPlan);
+      if (storedPlan) {
+        setWorkoutPlan(JSON.parse(storedPlan));
+      } else {
+        await generatePlanWithFallback(p);
+      }
+
+      const savedDiet = await AsyncStorage.getItem(STORAGE_KEYS.dietLogs);
+      if (savedDiet) {
+        const parsed: DietLog[] = JSON.parse(savedDiet).map((log: any) => ({
+          ...log,
+          timestamp: new Date(log.timestamp),
+        }));
+        setDietLogs(parsed);
+      }
+
+      const savedWeight = await AsyncStorage.getItem(STORAGE_KEYS.weightLogs);
+      if (savedWeight) {
+        setWeightLogs(JSON.parse(savedWeight));
+      }
+
+      const savedMessage = await AsyncStorage.getItem(STORAGE_KEYS.dailyMessage);
+      if (savedMessage) {
+        const parsed = JSON.parse(savedMessage);
+        if (parsed.date === todayDate()) {
+          setDailyMessage(parsed.text);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load app data:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (profile) {
+      loadAppData(profile);
+    }
+  }, [profile]);
+
+  const persistPlan = async (plan: WorkoutPlan) => {
+    setWorkoutPlan(plan);
+    await AsyncStorage.setItem(STORAGE_KEYS.workoutPlan, JSON.stringify(plan));
+  };
+
+  const generatePlanWithFallback = async (p: UserProfile) => {
+    setIsPlanLoading(true);
+    try {
+      const plan = await generateWorkoutPlan(p);
+      await persistPlan(plan);
+      return plan;
+    } catch (err) {
+      console.warn('Fallback plan is used because of error:', err);
+      await persistPlan(FALLBACK_PLAN);
+      return FALLBACK_PLAN;
+    } finally {
+      setIsPlanLoading(false);
     }
   };
 
   const handleOnboardingComplete = async (p: UserProfile) => {
     setProfile(p);
-    await AsyncStorage.setItem('profile', JSON.stringify(p));
+    await AsyncStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(p));
+    await generatePlanWithFallback(p);
     setView(AppView.Dashboard);
   };
 
   const handleLoginSuccess = async () => {
-    const savedProfile = await AsyncStorage.getItem('profile');
+    const savedProfile = await AsyncStorage.getItem(STORAGE_KEYS.profile);
     if (savedProfile) {
-      setProfile(JSON.parse(savedProfile));
+      const parsed = JSON.parse(savedProfile);
+      setProfile(parsed);
       setView(AppView.Dashboard);
+      await loadAppData(parsed);
     }
   };
 
-  useEffect(() => {
-    console.log('App state changed - isLoading:', isLoading, 'error:', error, 'view:', view);
-  }, [isLoading, error, view]);
+  const toggleExercise = async (dayLabel: string, exerciseId: string) => {
+    setWorkoutPlan((prev) => {
+      if (!prev) return prev;
+      const next: WorkoutPlan = {
+        ...prev,
+        schedule: prev.schedule.map((day) =>
+          day.day === dayLabel
+            ? {
+                ...day,
+                exercises: day.exercises.map((ex) =>
+                  ex.id === exerciseId ? { ...ex, isCompleted: !ex.isCompleted } : ex
+                ),
+              }
+            : day
+        ),
+      };
+      AsyncStorage.setItem(STORAGE_KEYS.workoutPlan, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const addDietLog = async (description: string) => {
+    setIsDietLoading(true);
+    try {
+      const result = await analyzeFoodImage(null, description);
+      const newLog: DietLog = {
+        id: `${Date.now()}`,
+        timestamp: new Date(),
+        foodName: result.foodName || description,
+        macros: {
+          calories: result.calories || 0,
+          protein: result.protein || 0,
+          fat: result.fat || 0,
+          carbs: result.carbs || 0,
+        },
+        advice: result.advice || 'バランスの良い食事を意識しましょう。',
+      };
+      const updated = [newLog, ...dietLogs];
+      setDietLogs(updated);
+      await AsyncStorage.setItem(STORAGE_KEYS.dietLogs, JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Food analysis failed, using fallback:', err);
+      const fallbackLog: DietLog = {
+        id: `${Date.now()}`,
+        timestamp: new Date(),
+        foodName: description,
+        macros: { calories: 480, protein: 25, fat: 15, carbs: 55 },
+        advice: 'タンパク質を少し増やし、野菜も追加するとさらに良いです。',
+      };
+      const updated = [fallbackLog, ...dietLogs];
+      setDietLogs(updated);
+      await AsyncStorage.setItem(STORAGE_KEYS.dietLogs, JSON.stringify(updated));
+    } finally {
+      setIsDietLoading(false);
+    }
+  };
+
+  const addWeightLog = async (weight: number) => {
+    const log: WeightLog = { id: `${Date.now()}`, date: todayDate(), weight };
+    const updated = [...weightLogs, log];
+    setWeightLogs(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.weightLogs, JSON.stringify(updated));
+  };
+
+  const refreshDailyMessage = async () => {
+    if (!profile) return;
+    setIsMessageLoading(true);
+    try {
+      const message = await generateDailyEncouragement(profile, todayCalories, targetCalories);
+      setDailyMessage(message);
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.dailyMessage,
+        JSON.stringify({ text: message, date: todayDate() })
+      );
+    } catch (err) {
+      console.warn('Daily message fallback:', err);
+      setDailyMessage('今日も健康的な一日を過ごしましょう！');
+    } finally {
+      setIsMessageLoading(false);
+    }
+  };
+
+  const resetAll = async () => {
+    await AsyncStorage.multiRemove([
+      STORAGE_KEYS.profile,
+      STORAGE_KEYS.workoutPlan,
+      STORAGE_KEYS.dietLogs,
+      STORAGE_KEYS.weightLogs,
+      STORAGE_KEYS.dailyMessage,
+    ]);
+    setProfile(null);
+    setWorkoutPlan(null);
+    setDietLogs([]);
+    setWeightLogs([]);
+    setDailyMessage(null);
+    setView(AppView.Auth);
+  };
 
   if (error) {
     return (
@@ -630,23 +1266,55 @@ const App = () => {
       )}
 
       {profile && view === AppView.Dashboard && (
-        <Dashboard profile={profile} onNavigate={setView} />
+        <Dashboard
+          profile={profile}
+          onNavigate={setView}
+          workoutPlan={workoutPlan}
+          todayCalories={todayCalories}
+          targetCalories={targetCalories}
+          dailyMessage={dailyMessage}
+          onRefreshMessage={refreshDailyMessage}
+          isRefreshingMessage={isMessageLoading}
+        />
       )}
 
       {profile && view === AppView.Workout && (
-        <PlaceholderScreen title="ワークアウト画面" />
+        <WorkoutScreen
+          plan={workoutPlan}
+          onToggleExercise={toggleExercise}
+          onRegenerate={() => profile && generatePlanWithFallback(profile)}
+          onBack={() => setView(AppView.Dashboard)}
+          isLoading={isPlanLoading}
+        />
       )}
 
       {profile && view === AppView.Diet && (
-        <PlaceholderScreen title="食事記録画面" />
+        <DietScreen
+          logs={dietLogs}
+          targetCalories={targetCalories}
+          onAddLog={addDietLog}
+          onBack={() => setView(AppView.Dashboard)}
+          isLoading={isDietLoading}
+        />
       )}
 
       {profile && view === AppView.Progress && (
-        <PlaceholderScreen title="進捗分析画面" />
+        <ProgressScreen
+          weightLogs={weightLogs}
+          profile={profile}
+          onAddWeight={addWeightLog}
+          dietLogs={dietLogs}
+          targetCalories={targetCalories}
+          onBack={() => setView(AppView.Dashboard)}
+        />
       )}
 
       {profile && view === AppView.Settings && (
-        <PlaceholderScreen title="設定画面" />
+        <SettingsScreen
+          profile={profile}
+          onReset={resetAll}
+          onBack={() => setView(AppView.Dashboard)}
+        />
       )}
     </>
   );
@@ -680,6 +1348,67 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.surface[50],
+  },
+  screenHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  screenTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: COLORS.surface[900],
+  },
+  backChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.surface[100],
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  backChipText: {
+    color: COLORS.surface[800],
+    fontWeight: '600',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.surface[900],
+    marginBottom: 6,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: COLORS.surface[500],
+    marginBottom: 12,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.surface[50],
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  badgeText: {
+    color: COLORS.surface[700],
+    fontWeight: '600',
+  },
+  textButton: {
+    paddingVertical: 6,
+  },
+  textButtonLabel: {
+    color: COLORS.primary[600],
+    fontWeight: '700',
   },
 
   // Auth Screen
@@ -1047,6 +1776,135 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: COLORS.surface[400],
+  },
+
+  // Workout
+  refreshButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.accent[100],
+  },
+  refreshText: {
+    color: COLORS.accent[500],
+    fontWeight: '700',
+  },
+  dayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  dayTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.surface[900],
+  },
+  dayFocus: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary[600],
+  },
+  exerciseRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 12,
+  },
+  exerciseCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: COLORS.surface[300],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exerciseCheckDone: {
+    backgroundColor: COLORS.primary[600],
+    borderColor: COLORS.primary[600],
+  },
+  exerciseName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.surface[900],
+  },
+  exerciseDesc: {
+    fontSize: 13,
+    color: COLORS.surface[500],
+    marginTop: 2,
+  },
+  exerciseMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  tag: {
+    backgroundColor: COLORS.surface[100],
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.surface[700],
+  },
+  exerciseDuration: {
+    fontSize: 12,
+    color: COLORS.surface[500],
+    fontWeight: '600',
+  },
+  youtubeButton: {
+    padding: 6,
+  },
+
+  // Diet
+  logHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  logDate: {
+    fontSize: 12,
+    color: COLORS.surface[400],
+  },
+  macrosRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  macroChip: {
+    backgroundColor: COLORS.surface[100],
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  macroLabel: {
+    fontSize: 12,
+    color: COLORS.surface[500],
+    fontWeight: '700',
+  },
+  macroValue: {
+    fontSize: 14,
+    color: COLORS.surface[900],
+    fontWeight: '700',
+  },
+  logAdvice: {
+    fontSize: 13,
+    color: COLORS.surface[600],
+    lineHeight: 18,
+  },
+
+  // Progress
+  chartContainer: {
+    marginTop: 12,
+    borderRadius: 16,
+    backgroundColor: COLORS.white,
   },
 
   // Placeholder
