@@ -12,41 +12,40 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
-// Colors
+// Design System - クリアコントラスト（App.tsxと統一）
 const COLORS = {
   primary: {
-    50: '#f0f9ff',
-    100: '#e0f2fe',
-    400: '#38bdf8',
-    500: '#0ea5e9',
-    600: '#0284c7',
-    700: '#0369a1',
+    50: '#eff6ff',
+    100: '#dbeafe',
+    400: '#2563eb',
+    500: '#1d4ed8',
+    600: '#1e40af',
+    700: '#1e3a8a',
   },
   accent: {
-    50: '#fff7ed',
-    100: '#ffedd5',
-    400: '#fb923c',
-    500: '#f97316',
+    50: '#fef3c7',
+    100: '#fde68a',
+    400: '#f59e0b',
+    500: '#d97706',
   },
   surface: {
-    50: '#f8fafc',
-    100: '#f1f5f9',
-    200: '#e2e8f0',
-    300: '#cbd5e1',
-    400: '#94a3b8',
-    500: '#64748b',
-    600: '#475569',
-    900: '#0f172a',
-  },
-  accent: {
-    50: '#fff7ed',
-    400: '#fb923c',
-    500: '#f97316',
+    50: '#ffffff',
+    100: '#f8fafc',
+    200: '#e5e7eb',
+    300: '#d1d5db',
+    400: '#9ca3af',
+    500: '#6b7280',
+    600: '#374151',
+    900: '#111827',
   },
   white: '#ffffff',
+  green: '#10b981',
   red: '#ef4444',
-  green: '#22c55e',
 };
+
+// Design Tokens
+const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 };
+const RADIUS = { sm: 8, md: 12, lg: 16, xl: 20, full: 9999 };
 
 // --- Card ---
 interface CardProps {
@@ -334,9 +333,9 @@ const styles = StyleSheet.create({
   // Card
   card: {
     backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.xl,
+    marginBottom: SPACING.lg,
     borderWidth: 1,
     borderColor: COLORS.surface[100],
     ...Platform.select({

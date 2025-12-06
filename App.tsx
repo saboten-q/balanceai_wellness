@@ -76,7 +76,7 @@ const BottomNav = ({
   </View>
 );
 
-// Constants (COLORS)を設定 - クリアコントラスト
+// Design System - クリアコントラスト
 const COLORS = {
   primary: {
     50: '#eff6ff',
@@ -104,6 +104,69 @@ const COLORS = {
   },
   white: '#ffffff',
   green: '#10b981',
+  success: '#10b981',
+  warning: '#f59e0b',
+  error: '#ef4444',
+};
+
+// Design Tokens
+const SPACING = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+};
+
+const RADIUS = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  full: 9999,
+};
+
+const TYPOGRAPHY = {
+  h1: { fontSize: 32, fontWeight: '700', lineHeight: 40 },
+  h2: { fontSize: 24, fontWeight: '700', lineHeight: 32 },
+  h3: { fontSize: 20, fontWeight: '700', lineHeight: 28 },
+  h4: { fontSize: 18, fontWeight: '600', lineHeight: 24 },
+  body: { fontSize: 16, fontWeight: '400', lineHeight: 24 },
+  bodyBold: { fontSize: 16, fontWeight: '600', lineHeight: 24 },
+  small: { fontSize: 14, fontWeight: '400', lineHeight: 20 },
+  smallBold: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  caption: { fontSize: 12, fontWeight: '600', lineHeight: 16, letterSpacing: 1 },
+};
+
+const SHADOWS = {
+  sm: Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+    },
+    android: { elevation: 2 },
+  }),
+  md: Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+    },
+    android: { elevation: 4 },
+  }),
+  lg: Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+    },
+    android: { elevation: 8 },
+  }),
 };
 
 const FALLBACK_PLAN: WorkoutPlan = {
@@ -623,7 +686,10 @@ const Dashboard = ({
       <ScrollView contentContainerStyle={styles.dashboardContent}>
         <View style={styles.dashboardHeader}>
           <View>
-            <Text style={styles.dashboardGreeting}>Hi, {profile.name} 👋</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.dashboardGreeting}>{profile.name}さん、こんにちは</Text>
+              <Icon name="hand-wave-outline" size={24} color={COLORS.primary[600]} />
+            </View>
             <View style={styles.targetContainer}>
               <Icon name="target" size={16} color={COLORS.primary[500]} />
               <Text style={styles.targetText}>
@@ -725,7 +791,10 @@ const Dashboard = ({
             <Icon name="emoticon-happy-outline" size={20} color={COLORS.accent[500]} />
           </View>
           <View style={styles.dailyMessageContent}>
-            <Text style={styles.dailyMessageLabel}>DAILY BOOST ✨</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.dailyMessageLabel}>DAILY MOTIVATION</Text>
+              <Icon name="lightning-bolt" size={12} color={COLORS.accent[500]} />
+            </View>
             <Text style={styles.dailyMessageText}>
               {dailyMessage || '今日も一歩ずつ。小さな積み重ねが大きな変化をつくります！'}
             </Text>
