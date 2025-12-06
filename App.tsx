@@ -828,44 +828,58 @@ const Dashboard = ({
 
         {/* ワークアウト＆食事アクションカード */}
         <View style={styles.gridRow}>
-          <Card onPress={() => onNavigate(AppView.Workout)} style={[styles.gridCardHalf, { backgroundColor: COLORS.primary[600], padding: 20 }]}>
-            <View style={styles.cardContent}>
-              <View style={[styles.cardIconSmall, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
-                <Icon name="dumbbell" size={18} color={COLORS.white} />
+          <Card onPress={() => onNavigate(AppView.Workout)} style={[styles.gridCardHalf, styles.actionCard, { borderLeftWidth: 4, borderLeftColor: COLORS.primary[600] }]}>
+            <GradientView
+              colors={[COLORS.primary[50], COLORS.white]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={{ padding: 20, borderRadius: 16, marginLeft: -20, marginTop: -20, marginRight: -20, marginBottom: -20 }}
+            >
+              <View style={styles.cardContent}>
+                <View style={[styles.cardIconSmall, { backgroundColor: COLORS.primary[100] }]}>
+                  <Icon name="dumbbell" size={18} color={COLORS.primary[600]} />
+                </View>
+                <Text style={styles.cardLabelSmall}>TODAY'S WORKOUT</Text>
               </View>
-              <Text style={[styles.cardLabelSmall, { color: 'rgba(255,255,255,0.9)' }]}>TODAY'S WORKOUT</Text>
-            </View>
-            <Text style={[styles.workoutFocus, { color: COLORS.white, fontSize: 16 }]}>
-              {todayPlan ? `${todayPlan.focus}` : 'プラン未生成'}
-            </Text>
-            <Text style={[styles.workoutSubtext, { color: 'rgba(255,255,255,0.8)', marginBottom: 8 }]}>
-              {todayPlan ? `残り ${totalCount - completedCount}種目` : 'プランを生成してください'}
-            </Text>
-            {todayPlan && (
-              <View style={[styles.workoutAction, { backgroundColor: 'rgba(255,255,255,0.2)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 }]}>
-                <Icon name="play" size={16} color={COLORS.white} />
-                <Text style={[styles.workoutActionText, { color: COLORS.white }]}>スタート</Text>
-              </View>
-            )}
+              <Text style={[styles.workoutFocus, { fontSize: 18 }]}>
+                {todayPlan ? `${todayPlan.focus}` : 'プラン未生成'}
+              </Text>
+              <Text style={[styles.workoutSubtext, { marginBottom: 8 }]}>
+                {todayPlan ? `残り ${totalCount - completedCount}種目` : 'プランを生成してください'}
+              </Text>
+              {todayPlan && (
+                <View style={[styles.workoutAction, { backgroundColor: COLORS.primary[600], paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 }]}>
+                  <Icon name="play" size={16} color={COLORS.white} />
+                  <Text style={[styles.workoutActionText, { color: COLORS.white }]}>スタート</Text>
+                </View>
+              )}
+            </GradientView>
           </Card>
 
-          <Card onPress={() => onNavigate(AppView.Diet)} style={[styles.gridCardHalf, { backgroundColor: COLORS.accent[400], padding: 20 }]}>
-            <View style={styles.cardContent}>
-              <View style={[styles.cardIconSmall, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
-                <Icon name="silverware-fork-knife" size={18} color={COLORS.white} />
+          <Card onPress={() => onNavigate(AppView.Diet)} style={[styles.gridCardHalf, styles.actionCard, { borderLeftWidth: 4, borderLeftColor: COLORS.accent[500] }]}>
+            <GradientView
+              colors={[COLORS.accent[50], COLORS.white]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={{ padding: 20, borderRadius: 16, marginLeft: -20, marginTop: -20, marginRight: -20, marginBottom: -20 }}
+            >
+              <View style={styles.cardContent}>
+                <View style={[styles.cardIconSmall, { backgroundColor: COLORS.accent[100] }]}>
+                  <Icon name="silverware-fork-knife" size={18} color={COLORS.accent[500]} />
+                </View>
+                <Text style={styles.cardLabelSmall}>NUTRITION</Text>
               </View>
-              <Text style={[styles.cardLabelSmall, { color: 'rgba(255,255,255,0.9)' }]}>NUTRITION</Text>
-            </View>
-            <Text style={[styles.workoutFocus, { color: COLORS.white, fontSize: 16 }]}>
-              {targetCalories - todayCalories > 0 ? `残り ${targetCalories - todayCalories}kcal` : '目標達成！'}
-            </Text>
-            <Text style={[styles.workoutSubtext, { color: 'rgba(255,255,255,0.8)', marginBottom: 8 }]}>
-              {todayCalories}kcal / {targetCalories}kcal
-            </Text>
-            <View style={[styles.workoutAction, { backgroundColor: 'rgba(255,255,255,0.2)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 }]}>
-              <Icon name="plus" size={16} color={COLORS.white} />
-              <Text style={[styles.workoutActionText, { color: COLORS.white }]}>記録する</Text>
-            </View>
+              <Text style={[styles.workoutFocus, { fontSize: 18 }]}>
+                {targetCalories - todayCalories > 0 ? `残り ${targetCalories - todayCalories}kcal` : '目標達成！'}
+              </Text>
+              <Text style={[styles.workoutSubtext, { marginBottom: 8 }]}>
+                {todayCalories}kcal / {targetCalories}kcal
+              </Text>
+              <View style={[styles.workoutAction, { backgroundColor: COLORS.accent[500], paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 }]}>
+                <Icon name="plus" size={16} color={COLORS.white} />
+                <Text style={[styles.workoutActionText, { color: COLORS.white }]}>記録する</Text>
+              </View>
+            </GradientView>
           </Card>
         </View>
 
@@ -914,22 +928,22 @@ const Dashboard = ({
 
         {/* 体重＆目標進捗 */}
         <View style={styles.gridRow}>
-          <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf, { backgroundColor: COLORS.green, padding: 20 }]}>
+          <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf, { borderLeftWidth: 4, borderLeftColor: COLORS.green }]}>
             <View style={styles.cardContent}>
-              <View style={[styles.cardIconSmall, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
-                <Icon name="scale-bathroom" size={18} color={COLORS.white} />
+              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.green, opacity: 0.1 }]}>
+                <Icon name="scale-bathroom" size={18} color={COLORS.green} />
               </View>
-              <Text style={[styles.cardLabelSmall, { color: 'rgba(255,255,255,0.9)' }]}>WEIGHT</Text>
+              <Text style={styles.cardLabelSmall}>WEIGHT</Text>
             </View>
-            <Text style={[styles.weightValue, { color: COLORS.white }]}>{profile.weight}kg</Text>
-            <Text style={[styles.weightTarget, { color: 'rgba(255,255,255,0.8)' }]}>
+            <Text style={styles.weightValue}>{profile.weight}kg</Text>
+            <Text style={styles.weightTarget}>
               目標: {profile.targetWeight}kg {profile.weight > profile.targetWeight ? `(${(profile.weight - profile.targetWeight).toFixed(1)}kg減)` : `(達成！)`}
             </Text>
           </Card>
 
-          <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf]}>
+          <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf, { borderLeftWidth: 4, borderLeftColor: COLORS.accent[500] }]}>
             <View style={styles.cardContent}>
-              <View style={styles.cardIconSmall}>
+              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.accent[100] }]}>
                 <Icon name="trophy-outline" size={18} color={COLORS.accent[500]} />
               </View>
               <Text style={styles.cardLabelSmall}>ACHIEVEMENTS</Text>
@@ -1070,7 +1084,6 @@ const WorkoutScreen = ({
   plan,
   onToggleExercise,
   onRegenerate,
-  onBack,
   isLoading,
   onNavigate,
   exerciseRecords,
@@ -1080,7 +1093,6 @@ const WorkoutScreen = ({
   plan: WorkoutPlan | null;
   onToggleExercise: (day: string, exerciseId: string) => void;
   onRegenerate: () => void;
-  onBack: () => void;
   isLoading: boolean;
   onNavigate: (view: AppView) => void;
   exerciseRecords: ExerciseRecord[];
@@ -1160,12 +1172,9 @@ const WorkoutScreen = ({
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.dashboardContent}>
-        <View style={styles.screenHeader}>
+        <View style={styles.screenHeaderSimple}>
+          <Icon name="dumbbell" size={28} color={COLORS.primary[600]} />
           <Text style={styles.screenTitle}>ワークアウト</Text>
-          <TouchableOpacity onPress={onBack} style={styles.backChip}>
-            <Icon name="arrow-left" size={18} color={COLORS.surface[900]} />
-            <Text style={styles.backChipText}>戻る</Text>
-          </TouchableOpacity>
         </View>
 
         <Card>
@@ -1311,14 +1320,12 @@ const DietScreen = ({
   logs,
   targetCalories,
   onAddLog,
-  onBack,
   isLoading,
   onNavigate,
 }: {
   logs: DietLog[];
   targetCalories: number;
   onAddLog: (description: string) => void;
-  onBack: () => void;
   isLoading: boolean;
   onNavigate: (view: AppView) => void;
 }) => {
@@ -1335,12 +1342,9 @@ const DietScreen = ({
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.dashboardContent}>
-          <View style={styles.screenHeader}>
+          <View style={styles.screenHeaderSimple}>
+            <Icon name="silverware-fork-knife" size={28} color={COLORS.accent[500]} />
             <Text style={styles.screenTitle}>食事ログ</Text>
-            <TouchableOpacity onPress={onBack} style={styles.backChip}>
-              <Icon name="arrow-left" size={18} color={COLORS.surface[900]} />
-              <Text style={styles.backChipText}>戻る</Text>
-            </TouchableOpacity>
           </View>
 
           <Card>
@@ -1403,7 +1407,6 @@ const ProgressScreen = ({
   weightLogs,
   profile,
   onAddWeight,
-  onBack,
   dietLogs,
   targetCalories,
   onNavigate,
@@ -1412,7 +1415,6 @@ const ProgressScreen = ({
   weightLogs: WeightLog[];
   profile: UserProfile;
   onAddWeight: (weight: number) => void;
-  onBack: () => void;
   dietLogs: DietLog[];
   targetCalories: number;
   onNavigate: (view: AppView) => void;
@@ -1523,12 +1525,9 @@ const ProgressScreen = ({
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.dashboardContent}>
-        <View style={styles.screenHeader}>
+        <View style={styles.screenHeaderSimple}>
+          <Icon name="chart-timeline-variant" size={28} color={COLORS.primary[600]} />
           <Text style={styles.screenTitle}>進捗</Text>
-          <TouchableOpacity onPress={onBack} style={styles.backChip}>
-            <Icon name="arrow-left" size={18} color={COLORS.surface[900]} />
-            <Text style={styles.backChipText}>戻る</Text>
-          </TouchableOpacity>
         </View>
 
         <Card>
@@ -1741,14 +1740,12 @@ const ProgressScreen = ({
 const SettingsScreen = ({
   profile,
   onReset,
-  onBack,
   onLogout,
   onEditProfile,
   onNavigate,
 }: {
   profile: UserProfile;
   onReset: () => void;
-  onBack: () => void;
   onLogout: () => void;
   onEditProfile: () => void;
   onNavigate: (view: AppView) => void;
@@ -1756,12 +1753,9 @@ const SettingsScreen = ({
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.dashboardContent}>
-        <View style={styles.screenHeader}>
+        <View style={styles.screenHeaderSimple}>
+          <Icon name="cog-outline" size={28} color={COLORS.surface[600]} />
           <Text style={styles.screenTitle}>設定</Text>
-          <TouchableOpacity onPress={onBack} style={styles.backChip}>
-            <Icon name="arrow-left" size={18} color={COLORS.surface[900]} />
-            <Text style={styles.backChipText}>戻る</Text>
-          </TouchableOpacity>
         </View>
 
         <Card>
@@ -2179,7 +2173,6 @@ const App = () => {
           plan={workoutPlan}
           onToggleExercise={toggleExercise}
           onRegenerate={() => profile && generatePlanWithFallback(profile)}
-          onBack={() => setView(AppView.Dashboard)}
           isLoading={isPlanLoading}
           onNavigate={setView}
           exerciseRecords={exerciseRecords}
@@ -2193,7 +2186,6 @@ const App = () => {
           logs={dietLogs}
           targetCalories={targetCalories}
           onAddLog={addDietLog}
-          onBack={() => setView(AppView.Dashboard)}
           isLoading={isDietLoading}
           onNavigate={setView}
         />
@@ -2206,7 +2198,6 @@ const App = () => {
           onAddWeight={addWeightLog}
           dietLogs={dietLogs}
           targetCalories={targetCalories}
-          onBack={() => setView(AppView.Dashboard)}
           onNavigate={setView}
           exerciseRecords={exerciseRecords}
         />
@@ -2218,7 +2209,6 @@ const App = () => {
           onReset={resetAll}
           onLogout={logout}
           onEditProfile={openEditProfile}
-          onBack={() => setView(AppView.Dashboard)}
           onNavigate={setView}
         />
       )}
@@ -2308,6 +2298,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  screenHeaderSimple: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
   screenTitle: {
     fontSize: 28,
     fontWeight: '700',
@@ -2325,6 +2321,10 @@ const styles = StyleSheet.create({
   backChipText: {
     color: COLORS.surface[800],
     fontWeight: '600',
+  },
+  actionCard: {
+    padding: 0,
+    overflow: 'hidden',
   },
   sectionTitle: {
     fontSize: 18,
