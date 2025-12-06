@@ -47,18 +47,18 @@ const GradientView = ({ colors, start, end, style, children }: any) => {
 // Constants (COLORS)を設定
 const COLORS = {
   primary: {
-    50: '#f0f9ff',
-    100: '#e0f2fe',
-    400: '#38bdf8',
-    500: '#0ea5e9',
-    600: '#0284c7',
-    700: '#0369a1',
+    50: '#eef2ff',
+    100: '#e0e7ff',
+    400: '#6366f1',
+    500: '#4f46e5',
+    600: '#4338ca',
+    700: '#3730a3',
   },
   accent: {
-    50: '#fff7ed',
-    100: '#ffedd5',
-    400: '#fb923c',
-    500: '#f97316',
+    50: '#ecfeff',
+    100: '#cffafe',
+    400: '#22d3ee',
+    500: '#06b6d4',
   },
   surface: {
     50: '#f8fafc',
@@ -517,6 +517,7 @@ const Dashboard = ({
   const todayPlan = workoutPlan?.schedule?.[todayIndex] || workoutPlan?.schedule?.[0];
   const completedCount = todayPlan ? todayPlan.exercises.filter((e) => e.isCompleted).length : 0;
   const totalCount = todayPlan?.exercises.length || 0;
+  const calorieProgress = targetCalories ? Math.min(1, todayCalories / targetCalories) : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -539,6 +540,27 @@ const Dashboard = ({
           </TouchableOpacity>
         </View>
 
+        <Text style={styles.sectionHeadline}>今日の概要</Text>
+        <Card>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>摂取カロリー</Text>
+              <Text style={styles.summaryValue}>{todayCalories} / {targetCalories} kcal</Text>
+              <View style={styles.progressBarTrack}>
+                <View style={[styles.progressBarFill, { width: `${calorieProgress * 100}%` }]} />
+              </View>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>今日のワークアウト</Text>
+              <Text style={styles.summaryValue}>{totalCount ? `${completedCount}/${totalCount}` : '未設定'}</Text>
+              <View style={styles.progressBarTrack}>
+                <View style={[styles.progressBarFill, { width: totalCount ? `${(completedCount / totalCount) * 100}%` : '0%' }]} />
+              </View>
+            </View>
+          </View>
+        </Card>
+
+        <Text style={styles.sectionHeadline}>アクション</Text>
         <Card style={styles.dailyMessageCard}>
           <View style={styles.dailyMessageIcon}>
             <Icon name="emoticon-happy-outline" size={20} color={COLORS.accent[500]} />
@@ -554,53 +576,51 @@ const Dashboard = ({
           </TouchableOpacity>
         </Card>
 
-        <Card onPress={() => onNavigate(AppView.Workout)} style={styles.workoutCard}>
-          <View style={styles.cardContent}>
-            <View style={styles.cardIconSmall}>
-              <Icon name="dumbbell" size={18} color={COLORS.surface[500]} />
-            </View>
-            <Text style={styles.cardLabelSmall}>Workout</Text>
-          </View>
-          <Text style={styles.workoutFocus}>
-            {todayPlan ? `${todayPlan.day} | ${todayPlan.focus}` : 'プラン未生成'}
-          </Text>
-          <Text style={styles.workoutSubtext}>
-            {totalCount ? `完了 ${completedCount}/${totalCount}` : 'タップして詳細を見る'}
-          </Text>
-          <View style={styles.workoutAction}>
-            <Text style={styles.workoutActionText}>詳細を見る</Text>
-            <Icon name="arrow-right" size={16} color={COLORS.primary[600]} />
-          </View>
-        </Card>
-
-        <Card onPress={() => onNavigate(AppView.Diet)} style={styles.dietCard}>
-          <GradientView
-            colors={[COLORS.accent[50], COLORS.primary[50]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.dietCardGradient}
-          >
+        <View style={styles.gridRow}>
+          <Card onPress={() => onNavigate(AppView.Workout)} style={[styles.gridCardHalf, styles.workoutCard]}>
             <View style={styles.cardContent}>
-              <View style={styles.cardIconLarge}>
-                <Icon name="food-apple" size={32} color={COLORS.accent[500]} />
+              <View style={styles.cardIconSmall}>
+                <Icon name="dumbbell" size={18} color={COLORS.surface[500]} />
               </View>
-              <View style={styles.dietCardContent}>
-                <Text style={styles.cardLabelSmall}>Nutrition</Text>
-                <Text style={styles.dietCalories}>本日のカロリー</Text>
-                <Text style={styles.dietSubtext}>
-                  {todayCalories} / {targetCalories} kcal
-                </Text>
-              </View>
+              <Text style={styles.cardLabelSmall}>Workout</Text>
             </View>
+            <Text style={styles.workoutFocus}>
+              {todayPlan ? `${todayPlan.day} | ${todayPlan.focus}` : 'プラン未生成'}
+            </Text>
+            <Text style={styles.workoutSubtext}>今日のプランを確認</Text>
             <View style={styles.workoutAction}>
-              <Text style={styles.workoutActionText}>記録する</Text>
-              <Icon name="plus" size={16} color={COLORS.primary[600]} />
+              <Text style={styles.workoutActionText}>プランを見る</Text>
+              <Icon name="arrow-right" size={16} color={COLORS.primary[600]} />
             </View>
-          </GradientView>
-        </Card>
+          </Card>
+
+          <Card onPress={() => onNavigate(AppView.Diet)} style={[styles.gridCardHalf, styles.dietCard]}>
+            <GradientView
+              colors={[COLORS.accent[50], COLORS.primary[50]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.dietCardGradient}
+            >
+              <View style={styles.cardContent}>
+                <View style={styles.cardIconLarge}>
+                  <Icon name="food-apple" size={32} color={COLORS.accent[500]} />
+                </View>
+                <View style={styles.dietCardContent}>
+                  <Text style={styles.cardLabelSmall}>Nutrition</Text>
+                  <Text style={styles.dietCalories}>食事を記録・確認</Text>
+                  <Text style={styles.dietSubtext}>今日の食事を追加、履歴をチェック</Text>
+                </View>
+              </View>
+              <View style={styles.workoutAction}>
+                <Text style={styles.workoutActionText}>記録する</Text>
+                <Icon name="plus" size={16} color={COLORS.primary[600]} />
+              </View>
+            </GradientView>
+          </Card>
+        </View>
 
         <View style={styles.gridRow}>
-          <Card onPress={() => onNavigate(AppView.Progress)} style={styles.weightCard}>
+          <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf, styles.weightCard]}>
             <View style={styles.cardContent}>
               <View style={styles.cardIconSmall}>
                 <Icon name="scale-bathroom" size={18} color={COLORS.surface[500]} />
@@ -609,6 +629,21 @@ const Dashboard = ({
             </View>
             <Text style={styles.weightValue}>{profile.weight}kg</Text>
             <Text style={styles.weightTarget}>目標: {profile.targetWeight}kg</Text>
+          </Card>
+
+          <Text style={styles.sectionHeadline}>クイックアクセス</Text>
+          <Card style={[styles.gridCardHalf]}>
+            <Text style={styles.sectionTitle}>クイックアクセス</Text>
+            <View style={styles.quickLinks}>
+              <TouchableOpacity onPress={() => onNavigate(AppView.Progress)} style={styles.quickLinkButton}>
+                <Icon name="chart-line" size={18} color={COLORS.primary[600]} />
+                <Text style={styles.quickLinkText}>進捗を見る</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => onNavigate(AppView.Settings)} style={styles.quickLinkButton}>
+                <Icon name="account-cog" size={18} color={COLORS.primary[600]} />
+                <Text style={styles.quickLinkText}>プロフィール / 設定</Text>
+              </TouchableOpacity>
+            </View>
           </Card>
         </View>
       </ScrollView>
@@ -1485,6 +1520,15 @@ const styles = StyleSheet.create({
     color: COLORS.surface[500],
     marginBottom: 12,
   },
+  sectionHeadline: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.surface[600],
+    marginTop: 12,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
   badgeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1753,6 +1797,9 @@ const styles = StyleSheet.create({
   workoutCard: {
     backgroundColor: COLORS.white,
   },
+  gridCardHalf: {
+    flex: 1,
+  },
   dietCard: {
     backgroundColor: COLORS.white,
     padding: 0,
@@ -1828,6 +1875,7 @@ const styles = StyleSheet.create({
   gridRow: {
     flexDirection: 'row',
     gap: 16,
+    flexWrap: 'wrap',
   },
   weightCard: {
     flex: 1,
@@ -1842,6 +1890,50 @@ const styles = StyleSheet.create({
   weightTarget: {
     fontSize: 14,
     color: COLORS.surface[500],
+  },
+  summaryRow: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  summaryItem: {
+    gap: 6,
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: COLORS.surface[500],
+    fontWeight: '600',
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.surface[900],
+  },
+  progressBarTrack: {
+    height: 8,
+    backgroundColor: COLORS.surface[200],
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary[500],
+  },
+  quickLinks: {
+    gap: 10,
+    marginTop: 8,
+  },
+  quickLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: COLORS.surface[100],
+    borderRadius: 12,
+  },
+  quickLinkText: {
+    color: COLORS.surface[900],
+    fontWeight: '600',
   },
 
   // Bottom Navigation
