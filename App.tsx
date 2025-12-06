@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Linking,
   Dimensions,
+  Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -502,6 +503,7 @@ const Dashboard = ({
   dailyMessage,
   onRefreshMessage,
   isRefreshingMessage,
+  onEditProfile,
 }: { 
   profile: UserProfile;
   onNavigate: (view: AppView) => void;
@@ -511,6 +513,7 @@ const Dashboard = ({
   dailyMessage: string | null;
   onRefreshMessage: () => void;
   isRefreshingMessage: boolean;
+  onEditProfile: () => void;
 }) => {
   const todayIndex = new Date().getDay(); // 0:Sun
   const todayPlan = workoutPlan?.schedule?.[todayIndex] || workoutPlan?.schedule?.[0];
@@ -529,6 +532,10 @@ const Dashboard = ({
                 目標まであと {Math.abs(profile.weight - profile.targetWeight!).toFixed(1)}kg
               </Text>
             </View>
+            <TouchableOpacity onPress={onEditProfile} style={styles.editChip}>
+              <Icon name="pencil" size={14} color={COLORS.surface[900]} />
+              <Text style={styles.editChipText}>プロフィールを編集</Text>
+            </TouchableOpacity>
           </View>
           <TouchableOpacity
             onPress={() => onNavigate(AppView.Settings)}
@@ -965,10 +972,12 @@ const SettingsScreen = ({
   profile,
   onReset,
   onBack,
+  onLogout,
 }: {
   profile: UserProfile;
   onReset: () => void;
   onBack: () => void;
+  onLogout: () => void;
 }) => {
   return (
     <SafeAreaView style={styles.container}>
@@ -997,6 +1006,14 @@ const SettingsScreen = ({
             <Text style={[styles.authButtonTextSecondary, { color: COLORS.primary[600] }]}>リセットしてサインアウト</Text>
           </Button>
         </Card>
+
+        <Card>
+          <Text style={styles.sectionTitle}>ログアウト</Text>
+          <Text style={styles.sectionSubtitle}>保存データは残したままログアウトします。</Text>
+          <Button onPress={onLogout} variant="secondary" style={{ marginTop: 12 }}>
+            <Text style={[styles.authButtonTextSecondary, { color: COLORS.surface[900] }]}>ログアウト</Text>
+          </Button>
+        </Card>
       </ScrollView>
     </SafeAreaView>
   );
@@ -1015,6 +1032,9 @@ const App = () => {
   const [isPlanLoading, setIsPlanLoading] = useState(false);
   const [isDietLoading, setIsDietLoading] = useState(false);
   const [isMessageLoading, setIsMessageLoading] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editProfileState, setEditProfileState] = useState<Partial<UserProfile> | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const targetCalories = useMemo(
     () => workoutPlan?.recommendedCalories ?? 2000,
@@ -1235,6 +1255,39 @@ const App = () => {
     setView(AppView.Auth);
   };
 
+  const logout = async () => {
+    await AsyncStorage.removeItem('authUser');
+    setView(AppView.Auth);
+  };
+
+  const openEditProfile = () => {
+    if (!profile) return;
+    setEditProfileState(profile);
+    setEditError(null);
+    setIsEditingProfile(true);
+  };
+
+  const saveEditedProfile = async () => {
+    if (!editProfileState) return;
+    if (!editProfileState.name) {
+      setEditError('名前を入力してください');
+      return;
+    }
+    if (!editProfileState.weight || !editProfileState.targetWeight) {
+      setEditError('体重と目標体重を入力してください');
+      return;
+    }
+    const updated: UserProfile = {
+      ...profile!,
+      ...editProfileState,
+      weight: Number(editProfileState.weight),
+      targetWeight: Number(editProfileState.targetWeight),
+    };
+    setProfile(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(updated));
+    setIsEditingProfile(false);
+  };
+
   if (error) {
     return (
       <View style={styles.loadingContainer}>
@@ -1275,6 +1328,7 @@ const App = () => {
           dailyMessage={dailyMessage}
           onRefreshMessage={refreshDailyMessage}
           isRefreshingMessage={isMessageLoading}
+          onEditProfile={openEditProfile}
         />
       )}
 
@@ -1313,9 +1367,57 @@ const App = () => {
         <SettingsScreen
           profile={profile}
           onReset={resetAll}
+          onLogout={logout}
           onBack={() => setView(AppView.Dashboard)}
         />
       )}
+
+      {/* プロフィール編集モーダル */}
+      <Modal
+        visible={isEditingProfile}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsEditingProfile(false)}
+      >
+        <View style={styles.modalOverlaySimple}>
+          <View style={styles.modalContentSimple}>
+            <Text style={styles.sectionTitle}>プロフィールを編集</Text>
+            {editError && <Text style={styles.modalError}>{editError}</Text>}
+            <Input
+              label="名前"
+              value={editProfileState?.name || ''}
+              onChangeText={(text) => setEditProfileState({ ...editProfileState!, name: text })}
+            />
+            <Input
+              label="現在の体重 (kg)"
+              value={editProfileState?.weight?.toString() || ''}
+              onChangeText={(text) => setEditProfileState({ ...editProfileState!, weight: Number(text) || 0 })}
+              keyboardType="numeric"
+            />
+            <Input
+              label="目標体重 (kg)"
+              value={editProfileState?.targetWeight?.toString() || ''}
+              onChangeText={(text) => setEditProfileState({ ...editProfileState!, targetWeight: Number(text) || 0 })}
+              keyboardType="numeric"
+            />
+            <Input
+              label="目標"
+              value={editProfileState?.goal || ''}
+              onChangeText={(text) => setEditProfileState({ ...editProfileState!, goal: text })}
+              multiline
+              numberOfLines={3}
+            />
+            <View style={styles.modalActions}>
+              <Button variant="ghost" onPress={() => setIsEditingProfile(false)} style={{ flex: 1 }}>
+                <Text style={styles.modalCancelText}>キャンセル</Text>
+              </Button>
+              <Button onPress={saveEditedProfile} style={{ flex: 1 }}>
+                <Text style={styles.authButtonText}>保存</Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 };
@@ -1900,6 +2002,23 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
+  // Edit chip
+  editChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: COLORS.surface[100],
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  editChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.surface[800],
+  },
+
   // Progress
   chartContainer: {
     marginTop: 12,
@@ -1925,6 +2044,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.surface[500],
     textAlign: 'center',
+  },
+
+  // Simple modal for profile edit
+  modalOverlaySimple: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContentSimple: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    gap: 12,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  modalCancelText: {
+    color: COLORS.surface[600],
+    fontWeight: '700',
+  },
+  modalError: {
+    color: '#ef4444',
+    fontWeight: '700',
   },
 });
 
