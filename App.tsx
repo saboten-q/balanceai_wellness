@@ -48,6 +48,12 @@ const COLORS = {
     600: '#0284c7',
     700: '#0369a1',
   },
+  accent: {
+    50: '#fff7ed',
+    100: '#ffedd5',
+    400: '#fb923c',
+    500: '#f97316',
+  },
   surface: {
     50: '#f8fafc',
     100: '#f1f5f9',
@@ -141,11 +147,13 @@ const AuthScreen = ({ onNavigate, onLoginSuccess }: {
   return (
     <View style={styles.container}>
       <GradientView
-        colors={[COLORS.primary[600], COLORS.primary[400], COLORS.primary[500]]}
+        colors={[COLORS.primary[700], COLORS.primary[500], COLORS.accent[500]]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      <View style={styles.glowPrimary} />
+      <View style={styles.glowAccent} />
       <SafeAreaView style={styles.authSafeArea}>
         <ScrollView contentContainerStyle={styles.authContent}>
           <Animated.View 
@@ -419,7 +427,7 @@ const Dashboard = ({
       <ScrollView contentContainerStyle={styles.dashboardContent}>
         <View style={styles.dashboardHeader}>
           <View>
-            <Text style={styles.dashboardGreeting}>Hi, {profile.name}</Text>
+            <Text style={styles.dashboardGreeting}>Hi, {profile.name} 👋</Text>
             <View style={styles.targetContainer}>
               <Icon name="target" size={16} color={COLORS.primary[500]} />
               <Text style={styles.targetText}>
@@ -437,12 +445,12 @@ const Dashboard = ({
 
         <Card style={styles.dailyMessageCard}>
           <View style={styles.dailyMessageIcon}>
-            <Icon name="star-four-points" size={20} color={COLORS.primary[500]} />
+            <Icon name="emoticon-happy-outline" size={20} color={COLORS.accent[500]} />
           </View>
           <View style={styles.dailyMessageContent}>
-            <Text style={styles.dailyMessageLabel}>DAILY MESSAGE</Text>
+            <Text style={styles.dailyMessageLabel}>DAILY BOOST ✨</Text>
             <Text style={styles.dailyMessageText}>
-              今日も一日頑張りましょう！継続は力なりです。
+              🌟 今日も一歩ずつ。小さな積み重ねが大きな変化をつくります！
             </Text>
           </View>
         </Card>
@@ -454,7 +462,7 @@ const Dashboard = ({
             </View>
             <Text style={styles.cardLabelSmall}>Workout</Text>
           </View>
-          <Text style={styles.workoutFocus}>今日のトレーニング</Text>
+          <Text style={styles.workoutFocus}>今日のトレーニング 💪</Text>
           <Text style={styles.workoutSubtext}>タップして詳細を見る</Text>
           <View style={styles.workoutAction}>
             <Text style={styles.workoutActionText}>詳細を見る</Text>
@@ -464,18 +472,18 @@ const Dashboard = ({
 
         <Card onPress={() => onNavigate(AppView.Diet)} style={styles.dietCard}>
           <GradientView
-            colors={[COLORS.primary[50], COLORS.primary[100]]}
+            colors={[COLORS.accent[50], COLORS.primary[50]]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.dietCardGradient}
           >
             <View style={styles.cardContent}>
               <View style={styles.cardIconLarge}>
-                <Icon name="food-apple" size={32} color={COLORS.primary[600]} />
+                <Icon name="food-apple" size={32} color={COLORS.accent[500]} />
               </View>
               <View style={styles.dietCardContent}>
                 <Text style={styles.cardLabelSmall}>Nutrition</Text>
-                <Text style={styles.dietCalories}>食事を記録しましょう</Text>
+                <Text style={styles.dietCalories}>🥗 食事を記録しましょう</Text>
                 <Text style={styles.dietSubtext}>今日のカロリー: 0 kcal</Text>
               </View>
             </View>
@@ -648,6 +656,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.surface[50],
+  },
+  glowPrimary: {
+    position: 'absolute',
+    top: -140,
+    left: -80,
+    width: 280,
+    height: 280,
+    borderRadius: 200,
+    backgroundColor: 'rgba(14, 165, 233, 0.18)',
+  },
+  glowAccent: {
+    position: 'absolute',
+    bottom: -120,
+    right: -60,
+    width: 260,
+    height: 260,
+    borderRadius: 180,
+    backgroundColor: 'rgba(249, 115, 22, 0.14)',
   },
   loadingContainer: {
     flex: 1,
@@ -865,8 +891,8 @@ const styles = StyleSheet.create({
   },
   dailyMessageCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.primary[50],
-    borderColor: COLORS.primary[100],
+    backgroundColor: COLORS.accent[50],
+    borderColor: COLORS.accent[100],
     borderWidth: 1,
     alignItems: 'flex-start',
     gap: 12,
@@ -885,7 +911,7 @@ const styles = StyleSheet.create({
   dailyMessageLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: COLORS.primary[600],
+    color: COLORS.accent[500],
     marginBottom: 4,
     letterSpacing: 1,
   },

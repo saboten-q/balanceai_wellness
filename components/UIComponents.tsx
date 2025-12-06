@@ -22,6 +22,12 @@ const COLORS = {
     600: '#0284c7',
     700: '#0369a1',
   },
+  accent: {
+    50: '#fff7ed',
+    100: '#ffedd5',
+    400: '#fb923c',
+    500: '#f97316',
+  },
   surface: {
     50: '#f8fafc',
     100: '#f1f5f9',
@@ -331,6 +337,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.surface[100],
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -387,7 +395,9 @@ const styles = StyleSheet.create({
     }),
   },
   buttonSecondary: {
-    backgroundColor: COLORS.surface[100],
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.surface[200],
   },
   buttonGhost: {
     backgroundColor: 'transparent',
