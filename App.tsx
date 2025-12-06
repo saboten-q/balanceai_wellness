@@ -718,6 +718,8 @@ const Dashboard = ({
         )}
 
         <Text style={styles.sectionHeadline}>アクション</Text>
+        
+        {/* DAILY BOOSTメッセージ */}
         <Card style={styles.dailyMessageCard}>
           <View style={styles.dailyMessageIcon}>
             <Icon name="emoticon-happy-outline" size={20} color={COLORS.accent[500]} />
@@ -733,89 +735,178 @@ const Dashboard = ({
           </TouchableOpacity>
         </Card>
 
-        <View style={styles.gridRow}>
-          <Card onPress={() => onNavigate(AppView.Workout)} style={[styles.gridCardHalf, styles.workoutCard]}>
-            <View style={styles.cardContent}>
-              <View style={styles.cardIconSmall}>
-                <Icon name="dumbbell" size={18} color={COLORS.surface[500]} />
-              </View>
-              <Text style={styles.cardLabelSmall}>Workout</Text>
+        {/* 今日のタスク概要 */}
+        <Card style={{ backgroundColor: COLORS.primary[50], borderColor: COLORS.primary[100], borderWidth: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Icon name="clipboard-check-outline" size={24} color={COLORS.primary[600]} />
+            <Text style={[styles.sectionTitle, { marginBottom: 0, marginLeft: 8 }]}>今日のタスク</Text>
+          </View>
+          <View style={styles.taskRow}>
+            <View style={styles.taskItem}>
+              <Icon name={completedCount === totalCount && totalCount > 0 ? "check-circle" : "circle-outline"} size={20} color={completedCount === totalCount && totalCount > 0 ? COLORS.green : COLORS.surface[400]} />
+              <Text style={styles.taskText}>ワークアウト完了 ({completedCount}/{totalCount})</Text>
             </View>
-            <Text style={styles.workoutFocus}>
-              {todayPlan ? `${todayPlan.day} | ${todayPlan.focus}` : 'プラン未生成'}
+            <View style={styles.taskItem}>
+              <Icon name={todayCalories >= targetCalories ? "check-circle" : "circle-outline"} size={20} color={todayCalories >= targetCalories ? COLORS.green : COLORS.surface[400]} />
+              <Text style={styles.taskText}>目標カロリー達成 ({Math.round((todayCalories/targetCalories)*100)}%)</Text>
+            </View>
+            <View style={styles.taskItem}>
+              <Icon name={todayCondition ? "check-circle" : "circle-outline"} size={20} color={todayCondition ? COLORS.green : COLORS.surface[400]} />
+              <Text style={styles.taskText}>コンディション記録</Text>
+            </View>
+          </View>
+        </Card>
+
+        {/* ワークアウト＆食事アクションカード */}
+        <View style={styles.gridRow}>
+          <Card onPress={() => onNavigate(AppView.Workout)} style={[styles.gridCardHalf, { backgroundColor: COLORS.primary[600], padding: 20 }]}>
+            <View style={styles.cardContent}>
+              <View style={[styles.cardIconSmall, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
+                <Icon name="dumbbell" size={18} color={COLORS.white} />
+              </View>
+              <Text style={[styles.cardLabelSmall, { color: 'rgba(255,255,255,0.9)' }]}>TODAY'S WORKOUT</Text>
+            </View>
+            <Text style={[styles.workoutFocus, { color: COLORS.white, fontSize: 16 }]}>
+              {todayPlan ? `${todayPlan.focus}` : 'プラン未生成'}
             </Text>
-            <Text style={styles.workoutSubtext}>今日のプランを確認</Text>
+            <Text style={[styles.workoutSubtext, { color: 'rgba(255,255,255,0.8)', marginBottom: 8 }]}>
+              {todayPlan ? `残り ${totalCount - completedCount}種目` : 'プランを生成してください'}
+            </Text>
             {todayPlan && (
-              <TouchableOpacity 
-                onPress={() => onNavigate(AppView.Workout)} 
-                style={[styles.workoutAction, { backgroundColor: COLORS.primary[600], paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginTop: 8 }]}
-              >
+              <View style={[styles.workoutAction, { backgroundColor: 'rgba(255,255,255,0.2)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 }]}>
                 <Icon name="play" size={16} color={COLORS.white} />
-                <Text style={[styles.workoutActionText, { color: COLORS.white }]}>クイックスタート</Text>
-              </TouchableOpacity>
-            )}
-            {!todayPlan && (
-              <View style={styles.workoutAction}>
-                <Text style={styles.workoutActionText}>プランを見る</Text>
-                <Icon name="arrow-right" size={16} color={COLORS.primary[600]} />
+                <Text style={[styles.workoutActionText, { color: COLORS.white }]}>スタート</Text>
               </View>
             )}
           </Card>
 
-          <Card onPress={() => onNavigate(AppView.Diet)} style={[styles.gridCardHalf, styles.dietCard]}>
-            <GradientView
-              colors={[COLORS.accent[50], COLORS.primary[50]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.dietCardGradient}
-            >
-              <View style={styles.cardContent}>
-                <View style={styles.cardIconLarge}>
-                  <Icon name="food-apple" size={32} color={COLORS.accent[500]} />
-                </View>
-                <View style={styles.dietCardContent}>
-                  <Text style={styles.cardLabelSmall}>Nutrition</Text>
-                  <Text style={styles.dietCalories}>食事を記録・確認</Text>
-                  <Text style={styles.dietSubtext}>今日の食事を追加、履歴をチェック</Text>
-                </View>
+          <Card onPress={() => onNavigate(AppView.Diet)} style={[styles.gridCardHalf, { backgroundColor: COLORS.accent[400], padding: 20 }]}>
+            <View style={styles.cardContent}>
+              <View style={[styles.cardIconSmall, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
+                <Icon name="silverware-fork-knife" size={18} color={COLORS.white} />
               </View>
-              <View style={styles.workoutAction}>
-                <Text style={styles.workoutActionText}>記録する</Text>
-                <Icon name="plus" size={16} color={COLORS.primary[600]} />
-              </View>
-            </GradientView>
+              <Text style={[styles.cardLabelSmall, { color: 'rgba(255,255,255,0.9)' }]}>NUTRITION</Text>
+            </View>
+            <Text style={[styles.workoutFocus, { color: COLORS.white, fontSize: 16 }]}>
+              {targetCalories - todayCalories > 0 ? `残り ${targetCalories - todayCalories}kcal` : '目標達成！'}
+            </Text>
+            <Text style={[styles.workoutSubtext, { color: 'rgba(255,255,255,0.8)', marginBottom: 8 }]}>
+              {todayCalories}kcal / {targetCalories}kcal
+            </Text>
+            <View style={[styles.workoutAction, { backgroundColor: 'rgba(255,255,255,0.2)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 }]}>
+              <Icon name="plus" size={16} color={COLORS.white} />
+              <Text style={[styles.workoutActionText, { color: COLORS.white }]}>記録する</Text>
+            </View>
           </Card>
         </View>
 
         <Text style={styles.sectionHeadline}>進捗</Text>
+        
+        {/* 週間進捗サマリー */}
+        <Card style={{ backgroundColor: COLORS.surface[50] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Icon name="chart-timeline-variant" size={24} color={COLORS.primary[600]} />
+            <Text style={[styles.sectionTitle, { marginBottom: 0, marginLeft: 8 }]}>週間進捗</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.summaryLabel}>トレーニング</Text>
+              <Text style={styles.summaryValue}>{exerciseRecords.filter(r => {
+                const last7 = [];
+                for (let i = 0; i < 7; i++) {
+                  const d = new Date();
+                  d.setDate(d.getDate() - i);
+                  last7.push(d.toISOString().split('T')[0]);
+                }
+                return last7.includes(r.date);
+              }).length}回</Text>
+              <Text style={styles.workoutSubtext}>過去7日</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.summaryLabel}>総セット数</Text>
+              <Text style={styles.summaryValue}>{exerciseRecords.filter(r => {
+                const last7 = [];
+                for (let i = 0; i < 7; i++) {
+                  const d = new Date();
+                  d.setDate(d.getDate() - i);
+                  last7.push(d.toISOString().split('T')[0]);
+                }
+                return last7.includes(r.date);
+              }).reduce((sum, r) => sum + r.sets.length, 0)}セット</Text>
+              <Text style={styles.workoutSubtext}>今週の合計</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.summaryLabel}>達成率</Text>
+              <Text style={styles.summaryValue}>{weeklyCompletion}%</Text>
+              <Text style={styles.workoutSubtext}>週間目標</Text>
+            </View>
+          </View>
+        </Card>
+
+        {/* 体重＆目標進捗 */}
         <View style={styles.gridRow}>
-          <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf, styles.weightCard]}>
+          <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf, { backgroundColor: COLORS.green, padding: 20 }]}>
+            <View style={styles.cardContent}>
+              <View style={[styles.cardIconSmall, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
+                <Icon name="scale-bathroom" size={18} color={COLORS.white} />
+              </View>
+              <Text style={[styles.cardLabelSmall, { color: 'rgba(255,255,255,0.9)' }]}>WEIGHT</Text>
+            </View>
+            <Text style={[styles.weightValue, { color: COLORS.white }]}>{profile.weight}kg</Text>
+            <Text style={[styles.weightTarget, { color: 'rgba(255,255,255,0.8)' }]}>
+              目標: {profile.targetWeight}kg {profile.weight > profile.targetWeight ? `(${(profile.weight - profile.targetWeight).toFixed(1)}kg減)` : `(達成！)`}
+            </Text>
+          </Card>
+
+          <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf]}>
             <View style={styles.cardContent}>
               <View style={styles.cardIconSmall}>
-                <Icon name="scale-bathroom" size={18} color={COLORS.surface[500]} />
+                <Icon name="trophy-outline" size={18} color={COLORS.accent[500]} />
               </View>
-              <Text style={styles.cardLabelSmall}>Weight</Text>
+              <Text style={styles.cardLabelSmall}>ACHIEVEMENTS</Text>
             </View>
-            <Text style={styles.weightValue}>{profile.weight}kg</Text>
-            <Text style={styles.weightTarget}>目標: {profile.targetWeight}kg</Text>
+            <Text style={styles.workoutFocus}>{streak}日連続</Text>
+            <Text style={styles.workoutSubtext}>最長ストリーク記録中！</Text>
+            <View style={styles.progressBarTrack}>
+              <View style={[styles.progressBarFill, { width: `${Math.min(100, (streak/30)*100)}%`, backgroundColor: COLORS.accent[500] }]} />
+            </View>
           </Card>
         </View>
 
         <Text style={styles.sectionHeadline}>クイックアクセス</Text>
-        <View style={styles.gridRow}>
-          <Card style={[styles.gridCardHalf]}>
-            <View style={styles.quickLinks}>
-              <TouchableOpacity onPress={() => onNavigate(AppView.Progress)} style={styles.quickLinkButton}>
-                <Icon name="chart-line" size={18} color={COLORS.primary[600]} />
-                <Text style={styles.quickLinkText}>進捗を見る</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => onNavigate(AppView.Settings)} style={styles.quickLinkButton}>
-                <Icon name="account-cog" size={18} color={COLORS.primary[600]} />
-                <Text style={styles.quickLinkText}>プロフィール / 設定</Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
-        </View>
+        
+        {/* クイックアクションボタングリッド */}
+        <Card>
+          <View style={styles.quickAccessGrid}>
+            <TouchableOpacity onPress={() => onNavigate(AppView.Progress)} style={styles.quickAccessItem}>
+              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.primary[50] }]}>
+                <Icon name="chart-line" size={20} color={COLORS.primary[600]} />
+              </View>
+              <Text style={styles.quickAccessText}>進捗確認</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => onNavigate(AppView.Settings)} style={styles.quickAccessItem}>
+              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.surface[100] }]}>
+                <Icon name="account-cog" size={20} color={COLORS.surface[600]} />
+              </View>
+              <Text style={styles.quickAccessText}>設定</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setShowConditionModal(true)} style={styles.quickAccessItem}>
+              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.accent[50] }]}>
+                <Icon name="heart-pulse" size={20} color={COLORS.accent[500]} />
+              </View>
+              <Text style={styles.quickAccessText}>体調記録</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={onRefreshMessage} style={styles.quickAccessItem}>
+              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.green, opacity: 0.1 }]}>
+                <Icon name="refresh" size={20} color={COLORS.green} />
+              </View>
+              <Text style={styles.quickAccessText}>メッセージ更新</Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
       </ScrollView>
       <BottomNav current={AppView.Dashboard} onNavigate={onNavigate} />
 
@@ -2864,6 +2955,41 @@ const styles = StyleSheet.create({
   },
   calendarDayTextActive: {
     color: COLORS.white,
+  },
+
+  // Task List
+  taskRow: {
+    gap: 8,
+  },
+  taskItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  taskText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.surface[700],
+  },
+
+  // Quick Access
+  quickAccessGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickAccessItem: {
+    width: '22%',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  quickAccessText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.surface[600],
+    textAlign: 'center',
   },
 });
 
