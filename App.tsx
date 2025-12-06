@@ -941,17 +941,17 @@ const Dashboard = ({
             </Text>
           </Card>
 
-          <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf, { borderLeftWidth: 4, borderLeftColor: COLORS.accent[500] }]}>
+          <Card onPress={() => onNavigate(AppView.Progress)} style={[styles.gridCardHalf, { borderLeftWidth: 4, borderLeftColor: COLORS.primary[600] }]}>
             <View style={styles.cardContent}>
-              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.accent[100] }]}>
-                <Icon name="trophy-outline" size={18} color={COLORS.accent[500]} />
+              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.primary[100] }]}>
+                <Icon name="trophy-outline" size={18} color={COLORS.primary[600]} />
               </View>
               <Text style={styles.cardLabelSmall}>ACHIEVEMENTS</Text>
             </View>
             <Text style={styles.workoutFocus}>{streak}日連続</Text>
             <Text style={styles.workoutSubtext}>最長ストリーク記録中！</Text>
             <View style={styles.progressBarTrack}>
-              <View style={[styles.progressBarFill, { width: `${Math.min(100, (streak/30)*100)}%`, backgroundColor: COLORS.accent[500] }]} />
+              <View style={[styles.progressBarFill, { width: `${Math.min(100, (streak/30)*100)}%`, backgroundColor: COLORS.primary[600] }]} />
             </View>
           </Card>
         </View>
@@ -976,15 +976,15 @@ const Dashboard = ({
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => setShowConditionModal(true)} style={styles.quickAccessItem}>
-              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.accent[50] }]}>
-                <Icon name="heart-pulse" size={20} color={COLORS.accent[500]} />
+              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.green, opacity: 0.1 }]}>
+                <Icon name="heart-pulse" size={20} color={COLORS.green} />
               </View>
               <Text style={styles.quickAccessText}>体調記録</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={onRefreshMessage} style={styles.quickAccessItem}>
-              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.green, opacity: 0.1 }]}>
-                <Icon name="refresh" size={20} color={COLORS.green} />
+              <View style={[styles.cardIconSmall, { backgroundColor: COLORS.accent[50] }]}>
+                <Icon name="refresh" size={20} color={COLORS.accent[500]} />
               </View>
               <Text style={styles.quickAccessText}>メッセージ更新</Text>
             </TouchableOpacity>
@@ -1759,15 +1759,27 @@ const SettingsScreen = ({
         </View>
 
         <Card>
-          <Text style={styles.sectionTitle}>プロフィール</Text>
-          <Text style={styles.sectionSubtitle}>名前: {profile.name}</Text>
-          <Text style={styles.sectionSubtitle}>目標: {profile.goal}</Text>
-          <Text style={styles.sectionSubtitle}>
-            体重: {profile.weight}kg / 目標 {profile.targetWeight}kg
-          </Text>
-          <Button onPress={onEditProfile} variant="secondary" style={{ marginTop: 12 }}>
-            <Text style={[styles.authButtonTextSecondary, { color: COLORS.surface[900] }]}>プロフィールを編集</Text>
-          </Button>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <Text style={styles.sectionTitle}>プロフィール</Text>
+            <TouchableOpacity onPress={onEditProfile} style={styles.editButton}>
+              <Icon name="pencil-outline" size={18} color={COLORS.primary[600]} />
+              <Text style={styles.editButtonText}>編集</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.profileInfoRow}>
+            <Icon name="account-outline" size={20} color={COLORS.surface[500]} />
+            <Text style={styles.profileInfoText}>{profile.name}</Text>
+          </View>
+          <View style={styles.profileInfoRow}>
+            <Icon name="target" size={20} color={COLORS.surface[500]} />
+            <Text style={styles.profileInfoText}>{profile.goal}</Text>
+          </View>
+          <View style={[styles.profileInfoRow, { borderBottomWidth: 0 }]}>
+            <Icon name="scale-bathroom" size={20} color={COLORS.surface[500]} />
+            <Text style={styles.profileInfoText}>
+              {profile.weight}kg / 目標 {profile.targetWeight}kg
+            </Text>
+          </View>
         </Card>
 
         <Card>
@@ -3059,6 +3071,35 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.surface[600],
     textAlign: 'center',
+  },
+
+  // Profile
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: COLORS.primary[50],
+    borderRadius: 8,
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary[600],
+  },
+  profileInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surface[100],
+  },
+  profileInfoText: {
+    fontSize: 15,
+    color: COLORS.surface[700],
+    flex: 1,
   },
 });
 
